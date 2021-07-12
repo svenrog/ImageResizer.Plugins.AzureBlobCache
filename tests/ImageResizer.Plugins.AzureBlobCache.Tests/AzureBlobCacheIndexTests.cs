@@ -1,12 +1,9 @@
 ﻿using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
-using ImageResizer.Caching.Core.Extensions;
-using ImageResizer.Plugins.AzureBlobCache.Tests.Helpers;
-using ImageResizer.Plugins.AzureBlobCache.Tests.Testables;
+using ImageResizer.Plugins.AzureBlobCache.Indexing;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
-using System.IO;
+using System.Data.Entity;
 using System.Threading.Tasks;
 
 namespace ImageResizer.Plugins.AzureBlobCache.Tests
@@ -20,45 +17,83 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         public AzureBlobCacheIndexTests()
         {
             _containerClient = new Lazy<BlobContainerClient>(InitializeContainer);
-            _randomizer = new Random();
+            _randomizer = new Random();            
         }
 
         [TestMethod]
-        public async Task IndexWillAutoPrune()
+        public async Task IndexWillAutoPruneByFileSize()
         {
-            //await UploadRandomBlobs(1_000_000_000, 512_000, 40_000);
+            ClearIndex();
 
-            var containerSize = await SizeOfContainerAsync();
+            var containerSize = await GetContainerSize();
             var containerSizeInMb = containerSize / 1_000_000.0;
             var uploadSize = 3_000_000;
 
-            await UploadRandomBlobs(uploadSize, 512_000, 10_000);
+            await InsertRandomIndexItems(uploadSize, 512_000, 10_000);
 
-            var index = CreateIndex((int)containerSizeInMb + 1);
-            await index.ManuallyPopulateIndex();
+            var index = CreateIndexSizeConstrained((int)containerSizeInMb + 1);
 
-            var initialCount = index.InternalIndex.Count;
+            var initialCount = await GetContainerItems();
 
             var testKey = Guid.NewGuid();
             var testSize = 512_000;
 
-            await UploadTestBlob(testKey, testSize);
             await index.NotifyAddedAsync(testKey, DateTime.UtcNow, testSize);
 
-            var currentCount = index.InternalIndex.Count;
+            var currentCount = await GetContainerItems();
 
             Assert.IsTrue(currentCount > 0);
             Assert.IsTrue(initialCount >= currentCount);
         }
 
-        private TestableAzureBlobCacheIndex CreateIndex(int indexSizeConstraintMb)
+        [TestMethod]
+        public async Task IndexWillAutoPruneByItems()
         {
-            return new TestableAzureBlobCacheIndex(indexSizeConstraintMb, () => _containerClient.Value);
+            ClearIndex();
+
+            await InsertRandomIndexItems(15_000_000, 512_000, 50_000);
+
+            var initialCount = await GetContainerItems();
+            var index = CreateIndexItemConstrained(initialCount);
+            var insertCount = 10;
+            
+            var itemsAdded = new List<Guid>();
+
+            for (var i = 0; i < insertCount; i++)
+            {
+                var item = Guid.NewGuid();
+                await index.NotifyAddedAsync(item, DateTime.UtcNow, 512_000);
+                itemsAdded.Add(item);
+            }
+            
+            var currentCount = await GetContainerItems();
+
+            Assert.IsTrue(currentCount > 0);
+            Assert.IsTrue(currentCount <= initialCount + insertCount);
+
+            using (var context = new IndexContext())
+            {
+                foreach (var itemKey in itemsAdded)
+                {
+                    var existingEntity = context.IndexEntities.Find(itemKey);
+                    Assert.IsNotNull(existingEntity);
+                }
+            }            
+        }
+
+        private AzureBlobCacheIndex CreateIndexSizeConstrained(int indexSizeConstraintMb)
+        {
+            return new AzureBlobCacheIndex(containerMaxSizeInMb: indexSizeConstraintMb, containerClientFactory: () => _containerClient.Value);
+        }
+
+        private AzureBlobCacheIndex CreateIndexItemConstrained(int indexItemConstraint)
+        {
+            return new AzureBlobCacheIndex(containerMaxItems: indexItemConstraint, containerClientFactory: () => _containerClient.Value);
         }
 
         private BlobContainerClient InitializeContainer()
         {
-            var serviceClient = new BlobServiceClient(Config.ConnectionString);
+            var serviceClient = new BlobServiceClient(Config.BlobConnectionString);
             var container = serviceClient.GetBlobContainerClient(Constants.IndexTestContainerName);
 
             container.CreateIfNotExists();
@@ -66,13 +101,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
             return container;
         }
 
-        private async Task UploadTestBlob(Guid key, int size)
-        {
-            var bytes = DataHelper.GetByteArray(size);
-            await _containerClient.Value.UploadBlobAsync($"{key:D}", new MemoryStream(bytes));
-        }
-
-        private async Task UploadRandomBlobs(long totalSize, int maxSize, int minSize)
+        private async Task InsertRandomIndexItems(long totalSize, int maxSize, int minSize)
         {
             var sizeRemaining = totalSize;
             var sizes = new List<int>();
@@ -87,50 +116,61 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
                 sizeRemaining -= size;
             }
 
-            var uploaded = new List<long>(sizes.Count);
-
-            await sizes.ForEachAsync(4, async (size) => 
+            using (var context = new IndexContext())
             {
-                var key = Guid.NewGuid();
+                context.Configuration.AutoDetectChangesEnabled = false;
 
-                using (var stream = DataHelper.GetStream(size))
+                foreach (var size in sizes)
                 {
-                    await _containerClient.Value.UploadBlobAsync($"{key:D}", stream);
+                    var key = Guid.NewGuid();
+                    var minuteOffset = _randomizer.Next(30, 100);
+                    var modified = DateTime.UtcNow.AddMinutes(-minuteOffset);
+                    var entity = new IndexEntity(key, modified, size);
+
+                    context.IndexEntities.Add(entity);
                 }
-            });
+
+                await context.SaveChangesAsync();
+            }
         }
 
-
-        private async Task<long> SizeOfContainerAsync()
+        protected virtual void ClearIndex()
         {
-            var totalSize = 0L;
-            var enumerator = _containerClient.Value.GetBlobsAsync(BlobTraits.None, BlobStates.None)
-                                                   .AsPages(default, 1000)
-                                                   .GetAsyncEnumerator();
+            using (var context = new IndexContext())
+            {
+                context.IndexEntities.RemoveRange(context.IndexEntities);
+                context.SaveChanges();
+            }
+        }
 
+        protected virtual async Task<long> GetContainerSize()
+        {
             try
             {
-                while (await enumerator.MoveNextAsync())
+                using (var context = new IndexContext())
                 {
-                    var blobPage = enumerator.Current;
-
-                    foreach (var blob in blobPage.Values)
-                    {
-                        if (!blob.Properties.ContentLength.HasValue)
-                            continue;
-                        
-                        var size = blob.Properties.ContentLength.Value;
-
-                        totalSize += size;
-                    }
+                    return await context.IndexEntities.SumAsync(x => x.Size);
                 }
             }
-            finally
+            catch (InvalidOperationException)
             {
-                await enumerator.DisposeAsync();
+                return 0;
             }
+        }
 
-            return totalSize;
+        protected virtual async Task<int> GetContainerItems()
+        {
+            try
+            {
+                using (var context = new IndexContext())
+                {
+                    return await context.IndexEntities.CountAsync();
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                return 0;
+            }
         }
     }
 }

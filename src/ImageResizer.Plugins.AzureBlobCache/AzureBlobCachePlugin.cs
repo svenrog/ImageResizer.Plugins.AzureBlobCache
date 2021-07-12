@@ -5,6 +5,7 @@ using ImageResizer.Caching.Core.Indexing;
 using ImageResizer.Configuration;
 using ImageResizer.Plugins.AzureBlobCache.Handlers;
 using System;
+using System.Configuration;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
@@ -15,13 +16,16 @@ namespace ImageResizer.Plugins.AzureBlobCache
     {
         private volatile bool _started = false;
 
-        protected string ConnectionString;
+        protected string ConnectionName = "ResizerAzureBlobs";
         protected string ContainerName = "imagecache";
         protected int TimeoutSeconds = 5;
 
         protected int MemoryStoreLimitMb;
         protected string MemoryStorePollingInterval = "00:04:01";
+
+        protected string IndexConnectionName = "ResizerEFConnection";
         protected int IndexMaxSizeMb;
+        protected int IndexMaxItems;
 
         private IAsyncCacheProvider _cacheProvider;
         private CancellationTokenSource _tokenSource;
@@ -87,13 +91,14 @@ namespace ImageResizer.Plugins.AzureBlobCache
         /// </summary>
         public void LoadSettings(Config config)
         {
-            ConnectionString = config.get("azureBlobCache.connectionString", null);
+            ConnectionName = config.get("azureBlobCache.connectionName", ConnectionName);
             ContainerName = config.get("azureBlobCache.containerName", ContainerName);
             TimeoutSeconds = config.get("azureBlobCache.timeoutSeconds", TimeoutSeconds);
+            IndexConnectionName = config.get("azureBlobCache.indexConnectionName", IndexConnectionName);
             IndexMaxSizeMb = config.get("azureBlobCache.indexMaxSizeMb", IndexMaxSizeMb);
+            IndexMaxItems = config.get("azureBlobCache.indexMaxItems", IndexMaxItems);
             MemoryStoreLimitMb = config.get("azureBlobCache.memoryStoreLimitMb", MemoryStoreLimitMb);
-            MemoryStorePollingInterval = config.get("azureBlobCache.memoryStorePollingInterval", MemoryStorePollingInterval);
-            
+            MemoryStorePollingInterval = config.get("azureBlobCache.memoryStorePollingInterval", MemoryStorePollingInterval);   
         }
 
         public void Process(HttpContext current, IResponseArgs e)
@@ -115,7 +120,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
         protected virtual void Start()
         {
             _tokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
-            _cacheProvider = new AzureBlobCache(ConnectionString, ContainerName, GetCacheIndex(), GetCacheStore());
+            _cacheProvider = new AzureBlobCache(GetConnectionString(), ContainerName, GetCacheIndex(), GetCacheStore());
             _started = true;
         }
 
@@ -124,10 +129,15 @@ namespace ImageResizer.Plugins.AzureBlobCache
             _started = false;
         }
 
+        private string GetConnectionString()
+        {
+            return ConfigurationManager.ConnectionStrings[ConnectionName]?.ConnectionString;
+        }
+
         private ICacheIndex GetCacheIndex()
         {
             if (IndexMaxSizeMb > 0)
-                return new AzureBlobCacheIndex(ConnectionString, ContainerName, IndexMaxSizeMb);
+                return new AzureBlobCacheIndex(IndexMaxSizeMb, IndexMaxItems, efConnectionName: GetConnectionString());
 
             return new NullCacheIndex();
         }

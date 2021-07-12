@@ -1,6 +1,5 @@
 ﻿using Azure;
 using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Specialized;
 using ImageResizer.Caching.Core;
 using ImageResizer.Caching.Core.Identity;
 using ImageResizer.Caching.Core.Indexing;
@@ -137,12 +136,10 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
                         var result = CreateResult(CacheQueryResult.Hit, stream);
 
-                        #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-                        _cacheIndex.NotifyAddedAsync(key, modified ?? DateTime.UtcNow, result.Contents.Length)
-                                   .ConfigureAwait(false);
-                        #pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-
                         _cacheStore.Insert(key, result);
+
+                        await _cacheIndex.NotifyAddedAsync(key, modified ?? DateTime.UtcNow, result.Contents.Length)
+                                         .ConfigureAwait(false);
 
                         return result;
                     }

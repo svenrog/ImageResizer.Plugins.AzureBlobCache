@@ -6,13 +6,6 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests.Testables
 {
     public class TestableAzureBlobCachePlugin : AzureBlobCachePlugin
     {
-        public TestableAzureBlobCachePlugin(string connectionString, string containerName = "imagecache", int timeoutSeconds = 10)
-        {
-            ConnectionString = connectionString;
-            ContainerName = containerName;
-            TimeoutSeconds = timeoutSeconds;
-        }
-
         public void ManualStart()
         {
             Start();
@@ -26,7 +19,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests.Testables
             {
                 await rewriter.TransformResponse(context.Response);
             }
-            catch (HttpException ex) when (ex.Message.StartsWith("OutputStream is not available"))
+            catch (HttpException ex) when (ex.Message.StartsWith("OutputStream"))
             {
                 return;
             }

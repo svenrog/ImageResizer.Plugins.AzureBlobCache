@@ -4,6 +4,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
 {
     public static class Config
     {
-        public static readonly string ConnectionString = ConfigurationManager.AppSettings["AzureBlobConnectionString"];
+        public static readonly string BlobConnectionString = ConfigurationManager.ConnectionStrings["ResizerAzureBlobs"]?.ConnectionString;
+        public static readonly string DbContextConnectionString = ConfigurationManager.ConnectionStrings["ResizerEFConnection"]?.ConnectionString;
     }
 }

@@ -107,7 +107,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
 
         private AzureBlobCachePlugin CreateBlobCachePlugin()
         {
-            var plugin = new TestableAzureBlobCachePlugin(Config.ConnectionString);
+            var plugin = new TestableAzureBlobCachePlugin();
 
             plugin.ManualStart();
 

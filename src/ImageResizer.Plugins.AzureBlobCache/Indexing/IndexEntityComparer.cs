@@ -2,9 +2,9 @@
 
 namespace ImageResizer.Plugins.AzureBlobCache.Indexing
 {
-    public class IndexItemComparer : IEqualityComparer<IndexItem>
+    public class IndexEntityComparer : IEqualityComparer<IndexEntity>
     {
-        public bool Equals(IndexItem x, IndexItem y)
+        public bool Equals(IndexEntity x, IndexEntity y)
         {
             if (x == null && y == null) return true;
             if (x == null || y == null) return true;
@@ -15,7 +15,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
             return true;
         }
 
-        public int GetHashCode(IndexItem obj)
+        public int GetHashCode(IndexEntity obj)
         {
             return obj?.Key.GetHashCode() ?? 0;
         }

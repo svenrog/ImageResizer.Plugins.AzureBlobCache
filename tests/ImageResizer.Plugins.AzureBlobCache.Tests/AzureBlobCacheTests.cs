@@ -146,19 +146,19 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
 
         private AzureBlobCache CreateDefaultBlobCache()
         {
-            return new AzureBlobCache(Config.ConnectionString, Constants.CacheTestContainerName);
+            return new AzureBlobCache(Config.BlobConnectionString, Constants.CacheTestContainerName);
         }
 
         private AzureBlobCache CreateIndexedBlobCache()
         {
-            var index = new AzureBlobCacheIndex(Config.ConnectionString, Constants.CacheTestContainerName, 10);
-            return new AzureBlobCache(Config.ConnectionString, Constants.CacheTestContainerName, index, new NullCacheStore());
+            var index = new AzureBlobCacheIndex(Config.BlobConnectionString, Constants.CacheTestContainerName, 10);
+            return new AzureBlobCache(Config.BlobConnectionString, Constants.CacheTestContainerName, index, new NullCacheStore());
         }
 
         private AzureBlobCache CreateMemoryStoreBlobCache()
         {
             var store = new AzureBlobCacheMemoryStore(200);
-            return new AzureBlobCache(Config.ConnectionString, Constants.CacheTestContainerName, store);
+            return new AzureBlobCache(Config.BlobConnectionString, Constants.CacheTestContainerName, store);
         }
     }
 }
