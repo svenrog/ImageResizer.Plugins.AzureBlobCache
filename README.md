@@ -10,7 +10,17 @@ Requires ImageResizer 4.0.1 or above
 
 - `install-package ImageResizer.Plugins.AzureBlobCache`
 
-Will add the following to `web.config`
+Requires ImageResizer to be configured with `ImageResizer.AsyncInterceptModule`.
+If `ImageResizer.InterceptModule` is configured, replace all instances of this 
+```
+ <add name="ImageResizingModule" type="ImageResizer.InterceptModule" />
+```
+with this
+```
+ <add name="ImageResizingModule" type="ImageResizer.AsyncInterceptModule" />
+```
+
+Additionally the following will be added to `web.config`
 
 ```
 <configuration>
