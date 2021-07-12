@@ -7,6 +7,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
         public IndexMigrationConfiguration()
         {
             AutomaticMigrationsEnabled = true;
+            AutomaticMigrationDataLossAllowed = true;
             ContextKey = "ImageResizer.Plugins.AzureBlobCache.Indexing.IndexContext";
         }
 
