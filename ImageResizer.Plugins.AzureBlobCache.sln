@@ -1,0 +1,49 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31424.327
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageResizer.Plugins.AzureBlobCache", "src\ImageResizer.Plugins.AzureBlobCache\ImageResizer.Plugins.AzureBlobCache.csproj", "{8E9F356C-6F76-42FC-A36D-D29C8F7D0E20}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageResizer.Plugins.AzureBlobCache.Tests", "tests\ImageResizer.Plugins.AzureBlobCache.Tests\ImageResizer.Plugins.AzureBlobCache.Tests.csproj", "{5C636A30-C855-4923-AEDF-8B5E973CF578}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{C86BBBED-D441-477A-8367-BBEF01E39A90}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageResizer.Caching.Core", "src\ImageResizer.Caching.Core\ImageResizer.Caching.Core.csproj", "{933FB57B-8123-4F78-B271-2B6EF8DBBADF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageResizer.Caching.Core.Tests", "tests\ImageResizer.Caching.Core.Tests\ImageResizer.Caching.Core.Tests.csproj", "{7099860B-2E17-44F7-A758-350F1BB4ED6B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8E9F356C-6F76-42FC-A36D-D29C8F7D0E20}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8E9F356C-6F76-42FC-A36D-D29C8F7D0E20}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8E9F356C-6F76-42FC-A36D-D29C8F7D0E20}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8E9F356C-6F76-42FC-A36D-D29C8F7D0E20}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5C636A30-C855-4923-AEDF-8B5E973CF578}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5C636A30-C855-4923-AEDF-8B5E973CF578}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5C636A30-C855-4923-AEDF-8B5E973CF578}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5C636A30-C855-4923-AEDF-8B5E973CF578}.Release|Any CPU.Build.0 = Release|Any CPU
+		{933FB57B-8123-4F78-B271-2B6EF8DBBADF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{933FB57B-8123-4F78-B271-2B6EF8DBBADF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{933FB57B-8123-4F78-B271-2B6EF8DBBADF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{933FB57B-8123-4F78-B271-2B6EF8DBBADF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7099860B-2E17-44F7-A758-350F1BB4ED6B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7099860B-2E17-44F7-A758-350F1BB4ED6B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7099860B-2E17-44F7-A758-350F1BB4ED6B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7099860B-2E17-44F7-A758-350F1BB4ED6B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{5C636A30-C855-4923-AEDF-8B5E973CF578} = {C86BBBED-D441-477A-8367-BBEF01E39A90}
+		{7099860B-2E17-44F7-A758-350F1BB4ED6B} = {C86BBBED-D441-477A-8367-BBEF01E39A90}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {E31D61A5-0DB9-4A7D-9D6B-3A5F055544F9}
+	EndGlobalSection
+EndGlobal
