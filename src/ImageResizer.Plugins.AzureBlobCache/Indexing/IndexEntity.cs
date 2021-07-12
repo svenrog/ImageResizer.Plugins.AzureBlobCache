@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ImageResizer.Plugins.AzureBlobCache.Indexing
 {
-
+    [Table("ImageResizerCacheIndex")]
     public class IndexEntity
     {
         public IndexEntity() { }
