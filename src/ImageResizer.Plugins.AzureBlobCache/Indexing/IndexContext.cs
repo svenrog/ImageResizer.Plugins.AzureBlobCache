@@ -2,7 +2,7 @@
 
 namespace ImageResizer.Plugins.AzureBlobCache.Indexing
 {
-    public class IndexContext : DbContext
+    public class IndexContext : ConcurrencyHandlingContextBase
     {
         public IndexContext() : base("ResizerEFConnection") 
         {

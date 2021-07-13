@@ -1,22 +1,27 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
     <metadata>
-        <id>ImageResizer.Plugins.AutoCrop</id>
-        <version>2.1.1</version>
-        <title>ImageResizer.Plugins.AutoCrop</title>
+        <id>ImageResizer.Plugins.AzureBlobCache</id>
+        <version>1.0.0</version>
+        <title>ImageResizer.Plugins.AzureBlobCache</title>
         <authors>Geta AS</authors>
         <owners>Geta AS</owners>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>Low tolerance auto cropping of images with whitespace</description>
-        <projectUrl>https://github.com/geta/imageresizer.plugins.autocrop</projectUrl>
-        <copyright>Copyright © Geta 2019</copyright>
+        <description>Azure blob storage caching for images resized with ImageResizer</description>
+        <projectUrl>https://github.com/svenrog/ImageResizer.Plugins.AzureBlobCache</projectUrl>
+        <copyright>Copyright © Geta 2021</copyright>
         <dependencies>
-            <group targetFramework=".NETFramework4.5">
-                <dependency id="ImageResizer" version="4.0.5" />
+            <group targetFramework=".NETFramework4.6.1">
+                <dependency id="ImageResizer" version="4.0.1"  />
+                <dependency id="System.Threading.Tasks.Extensions" version="4.5.2" />
+                <dependency id="EntityFramework" version="6.1.0" />
+                <dependency id="WindowsAzure.Storage" version="8.5.0" />
             </group>
         </dependencies>
     </metadata>
     <files>
+        <file src="bin\Release\ImageResizer.Caching.Core.dll" target="lib\net461" />
+        <file src="bin\Release\ImageResizer.Plugins.AzureBlobCache.dll" target="lib\net461" />
         <file src="content\web.config.transform" target="content\web.config.transform" />
     </files>
 </package>

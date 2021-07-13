@@ -28,11 +28,11 @@ namespace ImageResizer.Plugins.AzureBlobCache
         protected int IndexMaxItems;
 
         private IAsyncCacheProvider _cacheProvider;
-        private CancellationTokenSource _tokenSource;
 
         public async Task ProcessAsync(HttpContext context, IAsyncResponsePlan plan)
         {
-            var cacheResult = await _cacheProvider.GetAsync(plan.RequestCachingKey, plan.EstimatedFileExtension, _tokenSource.Token);
+            var cancellationToken = GetCancellationToken();
+            var cacheResult = await _cacheProvider.GetAsync(plan.RequestCachingKey, plan.EstimatedFileExtension, cancellationToken);
             if (cacheResult.Result == CacheQueryResult.Failed)
             {
                 throw new CacheTimeoutException($"Failed to aquire lock on file '{plan.RequestCachingKey}' in {TimeoutSeconds} seconds.");
@@ -42,9 +42,8 @@ namespace ImageResizer.Plugins.AzureBlobCache
             {
                 var path = plan.RequestCachingKey;
                 var extension = plan.EstimatedFileExtension;
-                var token = _tokenSource.Token;
 
-                cacheResult = await _cacheProvider.CreateAsync(path, extension, token, (stream) => plan.CreateAndWriteResultAsync(stream, plan));
+                cacheResult = await _cacheProvider.CreateAsync(path, extension, cancellationToken, (stream) => plan.CreateAndWriteResultAsync(stream, plan));
             }
 
             if (cacheResult.Result == CacheQueryResult.Failed)
@@ -119,8 +118,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
         protected virtual void Start()
         {
-            _tokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
-            _cacheProvider = new AzureBlobCache(GetConnectionString(), ContainerName, GetCacheIndex(), GetCacheStore());
+            _cacheProvider = new AzureBlobCache(GetConnection(ConnectionName), ContainerName, GetCacheIndex(), GetCacheStore());
             _started = true;
         }
 
@@ -129,15 +127,28 @@ namespace ImageResizer.Plugins.AzureBlobCache
             _started = false;
         }
 
-        private string GetConnectionString()
+        protected virtual CancellationToken GetCancellationToken()
         {
-            return ConfigurationManager.ConnectionStrings[ConnectionName]?.ConnectionString;
+            #if DEBUG 
+                return default(CancellationToken);
+            #endif
+            
+            var source = new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
+            return source.Token;
+        }
+
+        private string GetConnection(string name)
+        {
+            return ConfigurationManager.ConnectionStrings[name]?.ConnectionString;
         }
 
         private ICacheIndex GetCacheIndex()
         {
-            if (IndexMaxSizeMb > 0)
-                return new AzureBlobCacheIndex(IndexMaxSizeMb, IndexMaxItems, efConnectionName: GetConnectionString());
+            var maxSizeMb = IndexMaxSizeMb > 0 ? IndexMaxSizeMb : (int?)null;
+            var maxItems = IndexMaxItems > 0 ? IndexMaxItems : (int?)null;
+
+            if (maxSizeMb.HasValue || maxItems.HasValue)
+                return new AzureBlobCacheIndex(GetConnection(ConnectionName), ContainerName, maxSizeMb, maxItems, GetConnection(IndexConnectionName));
 
             return new NullCacheIndex();
         }

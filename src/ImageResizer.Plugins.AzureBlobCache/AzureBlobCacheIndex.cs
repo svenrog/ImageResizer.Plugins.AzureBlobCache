@@ -1,7 +1,8 @@
-﻿using Azure.Storage.Blobs;
-using ImageResizer.Caching.Core.Extensions;
+﻿using ImageResizer.Caching.Core.Extensions;
 using ImageResizer.Caching.Core.Indexing;
 using ImageResizer.Plugins.AzureBlobCache.Indexing;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Blob;
 using System;
 using System.Collections.Generic;
 using System.Data.Entity;
@@ -20,7 +21,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
         private readonly int _pruneInterval = 10;
         private readonly long _containerMaxSize;
         private readonly CleaningStrategy _cleanupStrategy;
-        private readonly Lazy<BlobContainerClient> _containerClient;
+        private readonly Lazy<CloudBlobContainer> _containerClient;
 
         private volatile int _pruneCounter = 0;
 
@@ -30,7 +31,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
             _containerName = containerName ?? throw new ArgumentNullException(nameof(containerName));    
         }
 
-        public AzureBlobCacheIndex(int? containerMaxSizeInMb = null, int? containerMaxItems = null, Func<BlobContainerClient> containerClientFactory = null, string efConnectionName = null)
+        public AzureBlobCacheIndex(int? containerMaxSizeInMb = null, int? containerMaxItems = null, Func<CloudBlobContainer> containerClientFactory = null, string efConnectionName = null)
         {
             if (containerMaxSizeInMb.HasValue)
             {
@@ -48,9 +49,9 @@ namespace ImageResizer.Plugins.AzureBlobCache
             }
 
             _efConnectionName = efConnectionName;
-            _containerClient = new Lazy<BlobContainerClient>(containerClientFactory ?? InitializeContainer);
-            _pruneSize = 50;
-            _pruneInterval = 10;
+            _containerClient = new Lazy<CloudBlobContainer>(containerClientFactory ?? InitializeContainer);
+            _pruneSize = 100;
+            _pruneInterval = 50;
             _pruneCounter = 0;
         }
 
@@ -88,7 +89,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
                         pruned = await Prune();
 
                     if (!pruned)
-                        await context.SaveChangesAsync();
+                        await context.SaveChangesDatabaseWinsAsync();
                 }
             }
         }
@@ -158,23 +159,32 @@ namespace ImageResizer.Plugins.AzureBlobCache
                     }
                 }
 
-                await removals.ForEachAsync(4, (entity) => _containerClient.Value.DeleteBlobAsync($"{entity.Key:D}"), (entity, result) =>
+                await removals.ForEachAsync(4, (entity) => DeleteBlob(entity.Key), (entity, result) =>
                 {
                     removed.Add(entity);
                 });
 
                 context.IndexEntities.RemoveRange(removals);
 
-                await context.SaveChangesAsync();
+                await context.SaveChangesDatabaseWinsAsync();
 
                 return true;
             }
         }
 
-        private BlobContainerClient InitializeContainer()
+        private Task<bool> DeleteBlob(Guid key)
         {
-            var serviceClient = new BlobServiceClient(_connectionString);
-            var container = serviceClient.GetBlobContainerClient(_containerName);
+            var reference = _containerClient.Value.GetBlockBlobReference($"{key:D}");
+            return reference.DeleteIfExistsAsync();
+        }
+
+        private CloudBlobContainer InitializeContainer()
+        {
+            if (!CloudStorageAccount.TryParse(_connectionString, out CloudStorageAccount storageAccount))
+                throw new ArgumentException("connectionString could not be parsed");
+
+            var serviceClient = storageAccount.CreateCloudBlobClient();
+            var container = serviceClient.GetContainerReference(_containerName);
 
             container.CreateIfNotExists();
 

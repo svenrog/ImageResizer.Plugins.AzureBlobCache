@@ -7,13 +7,11 @@ namespace ImageResizer.Caching.Core.Identity
 {
     public class MD5CacheKeyGenerator : ICacheKeyGenerator
     {
-        private readonly MD5 _hasher;
         private readonly Encoding _encoding;
         private readonly IFormatProvider _formatProvider;
 
         public MD5CacheKeyGenerator()
         {
-            _hasher = MD5.Create();
             _encoding = Encoding.Default;
             _formatProvider = NumberFormatInfo.InvariantInfo;
         }
@@ -21,7 +19,7 @@ namespace ImageResizer.Caching.Core.Identity
         public Guid Generate(string path)
         {
             var bytes = _encoding.GetBytes(path);
-            return new Guid(_hasher.ComputeHash(bytes));
+            return new Guid(MD5.Create().ComputeHash(bytes));
         }
 
         public Guid Generate(string path, string extension)

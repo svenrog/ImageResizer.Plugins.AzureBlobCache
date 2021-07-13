@@ -1,6 +1,7 @@
-﻿using Azure.Storage.Blobs;
-using ImageResizer.Plugins.AzureBlobCache.Indexing;
+﻿using ImageResizer.Plugins.AzureBlobCache.Indexing;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Blob;
 using System;
 using System.Collections.Generic;
 using System.Data.Entity;
@@ -11,12 +12,12 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
     [TestClass]
     public class AzureBlobCacheIndexTests
     {
-        private readonly Lazy<BlobContainerClient> _containerClient;
+        private readonly Lazy<CloudBlobContainer> _containerClient;
         private readonly Random _randomizer; 
 
         public AzureBlobCacheIndexTests()
         {
-            _containerClient = new Lazy<BlobContainerClient>(InitializeContainer);
+            _containerClient = new Lazy<CloudBlobContainer>(InitializeContainer);
             _randomizer = new Random();            
         }
 
@@ -25,14 +26,11 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         {
             ClearIndex();
 
-            var containerSize = await GetContainerSize();
-            var containerSizeInMb = containerSize / 1_000_000.0;
-            var uploadSize = 3_000_000;
+            var uploadSize = 15_000_000;
 
             await InsertRandomIndexItems(uploadSize, 512_000, 10_000);
 
-            var index = CreateIndexSizeConstrained((int)containerSizeInMb + 1);
-
+            var index = CreateIndexSizeConstrained(1);
             var initialCount = await GetContainerItems();
 
             var testKey = Guid.NewGuid();
@@ -91,10 +89,13 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
             return new AzureBlobCacheIndex(containerMaxItems: indexItemConstraint, containerClientFactory: () => _containerClient.Value);
         }
 
-        private BlobContainerClient InitializeContainer()
+        private CloudBlobContainer InitializeContainer()
         {
-            var serviceClient = new BlobServiceClient(Config.BlobConnectionString);
-            var container = serviceClient.GetBlobContainerClient(Constants.IndexTestContainerName);
+            if (!CloudStorageAccount.TryParse(Config.BlobConnectionString, out CloudStorageAccount storageAccount))
+                throw new ArgumentException("connectionString could not be parsed");
+
+            var serviceClient = storageAccount.CreateCloudBlobClient();
+            var container = serviceClient.GetContainerReference(Constants.IndexTestContainerName);
 
             container.CreateIfNotExists();
 
@@ -130,7 +131,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
                     context.IndexEntities.Add(entity);
                 }
 
-                await context.SaveChangesAsync();
+                await context.SaveChangesDatabaseWinsAsync();
             }
         }
 

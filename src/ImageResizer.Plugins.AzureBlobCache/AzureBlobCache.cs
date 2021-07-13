@@ -1,11 +1,12 @@
-﻿using Azure;
-using Azure.Storage.Blobs;
-using ImageResizer.Caching.Core;
+﻿using ImageResizer.Caching.Core;
 using ImageResizer.Caching.Core.Identity;
 using ImageResizer.Caching.Core.Indexing;
 using ImageResizer.Caching.Core.Threading;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Blob;
 using System;
 using System.IO;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -21,7 +22,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
         private readonly ICacheIndex _cacheIndex;
         private readonly ICacheStore _cacheStore;
 
-        private readonly Lazy<BlobContainerClient> _containerClient;
+        private readonly Lazy<CloudBlobContainer> _containerClient;
 
         public AzureBlobCache(string connectionString, string containerName) : this(connectionString, containerName, new NullCacheIndex(), new NullCacheStore(), new MD5CacheKeyGenerator()) { }
         public AzureBlobCache(string connectionString, string containerName, ICacheStore cacheStore) : this(connectionString, containerName, new NullCacheIndex(), cacheStore, new MD5CacheKeyGenerator()) { }
@@ -32,17 +33,17 @@ namespace ImageResizer.Plugins.AzureBlobCache
             _containerName = containerName ?? throw new ArgumentNullException(nameof(containerName));
         }
 
-        public AzureBlobCache(Func<BlobContainerClient> containerClientFactory) : this(new NullCacheIndex(), new NullCacheStore(), new MD5CacheKeyGenerator(), containerClientFactory) { }
-        public AzureBlobCache(ICacheIndex cacheIndex, Func<BlobContainerClient> containerClientFactory) : this(cacheIndex, new NullCacheStore(), new MD5CacheKeyGenerator(), containerClientFactory) { }
-        public AzureBlobCache(ICacheIndex cacheIndex, ICacheStore cacheStore, Func<BlobContainerClient> containerClientFactory) : this(cacheIndex, cacheStore, new MD5CacheKeyGenerator(), containerClientFactory) { }
-        protected AzureBlobCache(ICacheIndex cacheIndex, ICacheStore cacheStore, ICacheKeyGenerator keyGenerator, Func<BlobContainerClient> containerClientFactory = null)
+        public AzureBlobCache(Func<CloudBlobContainer> containerClientFactory) : this(new NullCacheIndex(), new NullCacheStore(), new MD5CacheKeyGenerator(), containerClientFactory) { }
+        public AzureBlobCache(ICacheIndex cacheIndex, Func<CloudBlobContainer> containerClientFactory) : this(cacheIndex, new NullCacheStore(), new MD5CacheKeyGenerator(), containerClientFactory) { }
+        public AzureBlobCache(ICacheIndex cacheIndex, ICacheStore cacheStore, Func<CloudBlobContainer> containerClientFactory) : this(cacheIndex, cacheStore, new MD5CacheKeyGenerator(), containerClientFactory) { }
+        protected AzureBlobCache(ICacheIndex cacheIndex, ICacheStore cacheStore, ICacheKeyGenerator keyGenerator, Func<CloudBlobContainer> containerClientFactory = null)
         {            
             _cacheIndex = cacheIndex ?? throw new ArgumentNullException(nameof(cacheIndex));
             _cacheStore = cacheStore ?? throw new ArgumentNullException(nameof(cacheStore));
             _keyGenerator = keyGenerator ?? throw new ArgumentNullException(nameof(keyGenerator));
 
             _synchronizer = new SemaphoreSynchronizer<Guid>();
-            _containerClient = new Lazy<BlobContainerClient>(containerClientFactory ?? InitializeContainer);
+            _containerClient = new Lazy<CloudBlobContainer>(containerClientFactory ?? InitializeContainer);
         }
 
         public Task<ICacheResult> GetAsync(string path, string extension, CancellationToken cancellationToken)
@@ -91,12 +92,12 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 {
                     var stream = new MemoryStream();
 
-                    await blob.DownloadToAsync(stream, cancellationToken)
+                    await blob.DownloadToStreamAsync(stream, cancellationToken)
                               .ConfigureAwait(false);
 
                     return CreateResult(CacheQueryResult.Hit, stream);
                 }
-                catch (RequestFailedException ex) when (ex.ErrorCode == "BlobNotFound")
+                catch (StorageException ex) when (ex.Message.Contains("(404)"))
                 {
                     return CreateResult(CacheQueryResult.Miss);
                 }
@@ -129,7 +130,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
                         stream.Seek(0, SeekOrigin.Begin);
 
-                        await blob.UploadAsync(stream, true, cancellationToken)
+                        await blob.UploadFromStreamAsync(stream, cancellationToken)
                                   .ConfigureAwait(false);
 
                         stream.Seek(0, SeekOrigin.Begin);
@@ -170,15 +171,18 @@ namespace ImageResizer.Plugins.AzureBlobCache
             return modified.HasValue ? _keyGenerator.Generate(path, extension, modified.Value) : _keyGenerator.Generate(path, extension);
         }
 
-        private BlobClient GetBlob(Guid key)
+        private CloudBlockBlob GetBlob(Guid key)
         {
-            return _containerClient.Value.GetBlobClient($"{key:D}");
+            return _containerClient.Value.GetBlockBlobReference($"{key:D}");
         }
 
-        private BlobContainerClient InitializeContainer()
+        private CloudBlobContainer InitializeContainer()
         {
-            var serviceClient = new BlobServiceClient(_connectionString);
-            var container = serviceClient.GetBlobContainerClient(_containerName);
+            if (!CloudStorageAccount.TryParse(_connectionString, out CloudStorageAccount storageAccount))
+                throw new ArgumentException("connectionString could not be parsed");
+
+            var serviceClient = storageAccount.CreateCloudBlobClient();
+            var container = serviceClient.GetContainerReference(_containerName);
 
             container.CreateIfNotExists();
 

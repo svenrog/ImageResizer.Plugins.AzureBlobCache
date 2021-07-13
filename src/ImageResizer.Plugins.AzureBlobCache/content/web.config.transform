@@ -1,7 +1,7 @@
 <configuration>
     <resizer>
         <plugins>
-            <add name="AutoCrop" />
+            <add name="AzureBlobCache" />
         </plugins>
     </resizer>    
 </configuration>

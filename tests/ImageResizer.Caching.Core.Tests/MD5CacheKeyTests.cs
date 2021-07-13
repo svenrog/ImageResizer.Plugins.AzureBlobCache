@@ -45,8 +45,8 @@ namespace ImageResizer.Caching.Core.Tests
             var generator = new MD5CacheKeyGenerator();
             var iterations = 1_000_000;
 
-            var paths = new HashSet<string>(iterations);
-            var results = new HashSet<Guid>(iterations);
+            var paths = new HashSet<string>();
+            var results = new HashSet<Guid>();
 
             for (var i = 0; i < iterations; i++)
             {

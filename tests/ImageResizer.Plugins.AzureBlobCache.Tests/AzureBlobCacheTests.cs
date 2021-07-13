@@ -38,6 +38,18 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         }
 
         [TestMethod]
+        public async Task CanMiss()
+        {
+            var blobCache = CreateDefaultBlobCache();
+            var path = "Test/neverbeforerequested.jpg";
+
+            var result = await GetAsync(blobCache, path);
+
+            Assert.AreEqual(CacheQueryResult.Miss, result.Result);
+            Assert.IsNull(result.Contents);
+        }
+
+        [TestMethod]
         public async Task CanGetWithIndexConfigured()
         {
             var blobCache = CreateIndexedBlobCache();
