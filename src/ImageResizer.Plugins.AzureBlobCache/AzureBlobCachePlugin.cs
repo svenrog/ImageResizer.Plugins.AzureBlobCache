@@ -4,6 +4,7 @@ using ImageResizer.Caching.Core.Exceptions;
 using ImageResizer.Caching.Core.Indexing;
 using ImageResizer.Configuration;
 using ImageResizer.Plugins.AzureBlobCache.Handlers;
+using ImageResizer.Plugins.Basic;
 using System;
 using System.Configuration;
 using System.Threading;
@@ -22,14 +23,14 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
         protected int MemoryStoreLimitMb;
         protected string MemoryStorePollingInterval = "00:04:01";
+        protected int ClientCacheMinutes;
 
-        protected string IndexConnectionName = "ResizerEFConnection";
         protected int IndexMaxSizeMb;
         protected int IndexMaxItems;
 
         private IAsyncCacheProvider _cacheProvider;
 
-        public async Task ProcessAsync(HttpContext context, IAsyncResponsePlan plan)
+        public virtual async Task ProcessAsync(HttpContext context, IAsyncResponsePlan plan)
         {
             var cancellationToken = GetCancellationToken();
             var cacheResult = await _cacheProvider.GetAsync(plan.RequestCachingKey, plan.EstimatedFileExtension, cancellationToken);
@@ -51,13 +52,22 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 throw new CacheTimeoutException($"Failed to aquire lock on file '{plan.RequestCachingKey}' in {TimeoutSeconds} seconds.");
             }
 
+            // Note: Since the async pipleine doesn't have support for client caching, we're patching it here.
+            // https://github.com/imazen/resizer/issues/166
+            // This was written 2021-07-13
+            PreHandleImage(context);
+
             if (cacheResult.Result == CacheQueryResult.Hit)
             {
-                await RemapResponseAsync(context, cacheResult.Contents, plan.EstimatedContentType);
+                RemapHitResponse(context, plan, cacheResult.Contents);
             }
-        }
+            else
+            {
+                RemapMissResponse(context, plan);
+            }
+        }       
 
-        public bool CanProcess(HttpContext context, IAsyncResponsePlan plan)
+        public virtual bool CanProcess(HttpContext context, IAsyncResponsePlan plan)
         {
             var instructions = new Instructions(plan.RewrittenQuerystring);
             if (instructions.Cache == ServerCacheMode.No) return false;
@@ -88,32 +98,26 @@ namespace ImageResizer.Plugins.AzureBlobCache
         /// Uses the defaults from the resizing.diskcache section in the specified configuration.
         /// Throws an invalid operation exception if the DiskCache is already started.
         /// </summary>
-        public void LoadSettings(Config config)
+        public virtual void LoadSettings(Config config)
         {
             ConnectionName = config.get("azureBlobCache.connectionName", ConnectionName);
             ContainerName = config.get("azureBlobCache.containerName", ContainerName);
             TimeoutSeconds = config.get("azureBlobCache.timeoutSeconds", TimeoutSeconds);
-            IndexConnectionName = config.get("azureBlobCache.indexConnectionName", IndexConnectionName);
             IndexMaxSizeMb = config.get("azureBlobCache.indexMaxSizeMb", IndexMaxSizeMb);
             IndexMaxItems = config.get("azureBlobCache.indexMaxItems", IndexMaxItems);
             MemoryStoreLimitMb = config.get("azureBlobCache.memoryStoreLimitMb", MemoryStoreLimitMb);
-            MemoryStorePollingInterval = config.get("azureBlobCache.memoryStorePollingInterval", MemoryStorePollingInterval);   
+            MemoryStorePollingInterval = config.get("azureBlobCache.memoryStorePollingInterval", MemoryStorePollingInterval);
+            ClientCacheMinutes = config.get("clientcache.minutes", ClientCacheMinutes);
         }
 
-        public void Process(HttpContext current, IResponseArgs e)
+        public virtual void Process(HttpContext current, IResponseArgs e)
         {
             throw new NotSupportedException("Only compatible with async pipeline, set 'ImageResizer.AsyncInterceptModule' instead of 'ImageResizer.InterceptModule' in Web.config");
         }
 
-        public bool CanProcess(HttpContext current, IResponseArgs e)
+        public virtual bool CanProcess(HttpContext current, IResponseArgs e)
         {
             throw new NotSupportedException("Only compatible with async pipeline, set 'ImageResizer.AsyncInterceptModule' instead of 'ImageResizer.InterceptModule' in Web.config");
-        }
-
-        protected virtual Task RemapResponseAsync(HttpContext context, byte[] data, string contentType)
-        {
-            context.RemapHandler(new MemoryCacheHandler(data, contentType));
-            return Task.CompletedTask;
         }
 
         protected virtual void Start()
@@ -137,6 +141,28 @@ namespace ImageResizer.Plugins.AzureBlobCache
             return source.Token;
         }
 
+        protected virtual void RemapHitResponse(HttpContext context, IAsyncResponsePlan plan, byte[] contents)
+        {
+            context.RemapHandler(new MemoryCacheHandler(contents, plan.EstimatedContentType));
+        }
+
+        protected virtual void RemapMissResponse(HttpContext context, IAsyncResponsePlan plan)
+        {
+            context.RemapHandler(new NoCacheAsyncHandler(plan));
+        }
+
+        protected virtual void PreHandleImage(HttpContext context)
+        {
+            if (ClientCacheMinutes > 0)
+                context.Response.Expires = ClientCacheMinutes;
+
+            if (context.Request.IsAuthenticated)
+                context.Response.CacheControl = HttpCacheability.Private.ToString();
+            else
+                context.Response.CacheControl = HttpCacheability.Public.ToString();
+
+        }
+
         private string GetConnection(string name)
         {
             return ConfigurationManager.ConnectionStrings[name]?.ConnectionString;
@@ -148,7 +174,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
             var maxItems = IndexMaxItems > 0 ? IndexMaxItems : (int?)null;
 
             if (maxSizeMb.HasValue || maxItems.HasValue)
-                return new AzureBlobCacheIndex(GetConnection(ConnectionName), ContainerName, maxSizeMb, maxItems, GetConnection(IndexConnectionName));
+                return new AzureBlobCacheIndex(GetConnection(ConnectionName), ContainerName, maxSizeMb, maxItems);
 
             return new NullCacheIndex();
         }

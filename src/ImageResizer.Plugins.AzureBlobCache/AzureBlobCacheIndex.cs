@@ -96,10 +96,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
         protected virtual IndexContext GetContext()
         {
-            if (string.IsNullOrEmpty(_efConnectionName))
-                return new IndexContext();
-
-            return new IndexContext(_efConnectionName);
+            return new IndexContext();
         }
 
         protected virtual async Task<long> GetContainerSize()

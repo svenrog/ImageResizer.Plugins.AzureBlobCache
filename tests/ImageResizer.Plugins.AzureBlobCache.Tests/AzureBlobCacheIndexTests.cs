@@ -69,7 +69,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
             Assert.IsTrue(currentCount > 0);
             Assert.IsTrue(currentCount <= initialCount + insertCount);
 
-            using (var context = new IndexContext())
+            using (var context = CreateEfContext())
             {
                 foreach (var itemKey in itemsAdded)
                 {
@@ -77,6 +77,11 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
                     Assert.IsNotNull(existingEntity);
                 }
             }            
+        }
+
+        private IndexContext CreateEfContext()
+        {
+            return new IndexContext();
         }
 
         private AzureBlobCacheIndex CreateIndexSizeConstrained(int indexSizeConstraintMb)
@@ -117,7 +122,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
                 sizeRemaining -= size;
             }
 
-            using (var context = new IndexContext())
+            using (var context = CreateEfContext())
             {
                 context.Configuration.AutoDetectChangesEnabled = false;
 
@@ -137,7 +142,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
 
         protected virtual void ClearIndex()
         {
-            using (var context = new IndexContext())
+            using (var context = CreateEfContext())
             {
                 context.IndexEntities.RemoveRange(context.IndexEntities);
                 context.SaveChanges();
@@ -148,7 +153,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         {
             try
             {
-                using (var context = new IndexContext())
+                using (var context = CreateEfContext())
                 {
                     return await context.IndexEntities.SumAsync(x => x.Size);
                 }
@@ -163,7 +168,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         {
             try
             {
-                using (var context = new IndexContext())
+                using (var context = CreateEfContext())
                 {
                     return await context.IndexEntities.CountAsync();
                 }

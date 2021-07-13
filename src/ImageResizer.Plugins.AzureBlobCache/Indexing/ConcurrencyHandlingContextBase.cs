@@ -10,7 +10,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
     {
         protected ConcurrencyHandlingContextBase(string nameOrConnectionString) : base(nameOrConnectionString)
         {
-        }        
+        }
 
         public virtual int SaveChangesDatabaseWins(int retries = 1)
         {

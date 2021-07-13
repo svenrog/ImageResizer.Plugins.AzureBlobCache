@@ -1,5 +1,4 @@
 ﻿using ImageResizer.Plugins.AzureBlobCache.Handlers;
-using System.Threading.Tasks;
 using System.Web;
 
 namespace ImageResizer.Plugins.AzureBlobCache.Tests.Testables
@@ -11,13 +10,15 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests.Testables
             Start();
         }
 
-        protected override async Task RemapResponseAsync(HttpContext context, byte[] data, string contentType)
+        protected override void RemapHitResponse(HttpContext context, IAsyncResponsePlan plan, byte[] data)
         {
-            var rewriter = new ResponseTransformer(data, contentType);
+            var rewriter = new ResponseTransformer(data, plan.EstimatedContentType);
 
             try
             {
-                await rewriter.TransformResponse(context.Response);
+                rewriter.TransformResponse(context.Response)
+                        .GetAwaiter()
+                        .GetResult();
             }
             catch (HttpException ex) when (ex.Message.StartsWith("OutputStream"))
             {
