@@ -25,5 +25,13 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests.Testables
                 return;
             }
         }
+
+        public override void LoadSettings(Configuration.Config config)
+        {
+            base.LoadSettings(config);
+
+            ConnectionName = Constants.BlobConnectionName;
+            ContainerName = Constants.CacheTestContainerName;
+        }
     }
 }

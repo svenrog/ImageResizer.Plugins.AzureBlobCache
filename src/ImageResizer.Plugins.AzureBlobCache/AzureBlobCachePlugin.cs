@@ -23,10 +23,11 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
         protected int MemoryStoreLimitMb;
         protected string MemoryStorePollingInterval = "00:04:01";
-        protected int ClientCacheMinutes;
 
         protected int IndexMaxSizeMb;
         protected int IndexMaxItems;
+
+        protected int ClientCacheMinutes;
 
         private IAsyncCacheProvider _cacheProvider;
 

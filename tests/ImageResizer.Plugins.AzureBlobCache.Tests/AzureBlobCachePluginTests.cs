@@ -51,7 +51,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
 
                     Assert.ThrowsException<NotSupportedException>(() => plugin.Process(context, args));
                 }
-            }           
+            }
         }
 
         private TestResponseArgs CreateArgs(string path, Stream stream)

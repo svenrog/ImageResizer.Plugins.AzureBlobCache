@@ -145,7 +145,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
             using (var context = CreateEfContext())
             {
                 context.IndexEntities.RemoveRange(context.IndexEntities);
-                context.SaveChanges();
+                context.SaveChangesDatabaseWins();
             }
         }
 

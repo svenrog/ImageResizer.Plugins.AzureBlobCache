@@ -6,7 +6,6 @@ using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using System;
 using System.IO;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -46,29 +45,9 @@ namespace ImageResizer.Plugins.AzureBlobCache
             _containerClient = new Lazy<CloudBlobContainer>(containerClientFactory ?? InitializeContainer);
         }
 
-        public Task<ICacheResult> GetAsync(string path, string extension, CancellationToken cancellationToken)
+        public async Task<ICacheResult> GetAsync(string path, string extension, CancellationToken cancellationToken)
         {
-            return GetAsync(path, extension, null, cancellationToken);
-        }
-
-        public Task<ICacheResult> GetAsync(string path, string extension, DateTime modified, CancellationToken cancellationToken)
-        {
-            return GetAsync(path, extension, modified, cancellationToken);
-        }
-
-        public Task<ICacheResult> CreateAsync(string path, string extension, CancellationToken cancellationToken, Func<Stream, Task> asyncWriter)
-        {
-            return CreateAsync(path, extension, null, cancellationToken, asyncWriter);
-        }
-
-        public Task<ICacheResult> CreateAsync(string path, string extension, DateTime modified, CancellationToken cancellationToken, Func<Stream, Task> asyncWriter)
-        {
-            return CreateAsync(path, extension, modified, cancellationToken, asyncWriter);
-        }
-
-        private async Task<ICacheResult> GetAsync(string path, string extension, DateTime? modified, CancellationToken cancellationToken)
-        {
-            var key = GetKey(path, extension, modified);
+            var key = GetKey(path, extension);
 
             // Optimistic cache fetch
             var storedResult = _cacheStore.Get(key);
@@ -110,11 +89,11 @@ namespace ImageResizer.Plugins.AzureBlobCache
             {
                 return CreateResult(CacheQueryResult.Failed);
             }
-        }       
+        }
 
-        private async Task<ICacheResult> CreateAsync(string path, string extension, DateTime? modified, CancellationToken cancellationToken, Func<Stream, Task> asyncWriter)
+        public async Task<ICacheResult> CreateAsync(string path, string extension, CancellationToken cancellationToken, Func<Stream, Task> asyncWriter)
         {
-            var key = GetKey(path, extension, modified);
+            var key = GetKey(path, extension);
             var blob = GetBlob(key);
             var writeLock = _synchronizer[key];
 
@@ -139,7 +118,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
                         _cacheStore.Insert(key, result);
 
-                        await _cacheIndex.NotifyAddedAsync(key, modified ?? DateTime.UtcNow, result.Contents.Length)
+                        await _cacheIndex.NotifyAddedAsync(key, DateTime.UtcNow, result.Contents.Length)
                                          .ConfigureAwait(false);
 
                         return result;
@@ -166,9 +145,9 @@ namespace ImageResizer.Plugins.AzureBlobCache
             };
         }
 
-        private Guid GetKey(string path, string extension, DateTime? modified = null)
+        private Guid GetKey(string path, string extension)
         {
-            return modified.HasValue ? _keyGenerator.Generate(path, extension, modified.Value) : _keyGenerator.Generate(path, extension);
+            return _keyGenerator.Generate(path, extension);
         }
 
         private CloudBlockBlob GetBlob(Guid key)

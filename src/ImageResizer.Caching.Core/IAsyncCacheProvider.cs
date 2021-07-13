@@ -8,8 +8,6 @@ namespace ImageResizer.Caching.Core
     public interface IAsyncCacheProvider
     {
         Task<ICacheResult> GetAsync(string path, string extension, CancellationToken cancellationToken);
-        Task<ICacheResult> GetAsync(string path, string extension, DateTime modified, CancellationToken cancellationToken);
         Task<ICacheResult> CreateAsync(string path, string extension, CancellationToken cancellationToken, Func<Stream, Task> asyncWriter);
-        Task<ICacheResult> CreateAsync(string path, string extension, DateTime modified, CancellationToken cancellationToken, Func<Stream, Task> asyncWriter);
     }
 }

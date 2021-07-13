@@ -13,15 +13,15 @@ namespace ImageResizer.Plugins.AzureBlobCache
 {
     public class AzureBlobCacheIndex : ICacheIndex
     {
-        private readonly string _efConnectionName;
         private readonly string _connectionString;
         private readonly string _containerName;
 
-        private readonly int _pruneSize;
-        private readonly int _pruneInterval = 10;
         private readonly long _containerMaxSize;
         private readonly CleaningStrategy _cleanupStrategy;
         private readonly Lazy<CloudBlobContainer> _containerClient;
+
+        private readonly int _pruneSize;
+        private readonly int _pruneInterval = 10;
 
         private volatile int _pruneCounter = 0;
 
@@ -48,8 +48,8 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 throw new ArgumentNullException($"Both {nameof(containerMaxSizeInMb)} and {nameof(containerMaxItems)} cannot be null.");
             }
 
-            _efConnectionName = efConnectionName;
             _containerClient = new Lazy<CloudBlobContainer>(containerClientFactory ?? InitializeContainer);
+
             _pruneSize = 100;
             _pruneInterval = 50;
             _pruneCounter = 0;
