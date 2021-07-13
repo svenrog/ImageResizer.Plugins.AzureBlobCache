@@ -57,7 +57,9 @@ This element has a list of attributes that can be provided for detailed control 
 ### Only compatible with the async pipeline
 
 Requires ImageResizer to be configured with `ImageResizer.AsyncInterceptModule`.
+
 If `ImageResizer.InterceptModule` is configured, replace all instances of this 
+
 ```
  <add name="ImageResizingModule" type="ImageResizer.InterceptModule" />
 ```
