@@ -31,11 +31,13 @@ This configration element has a list of attributes that can be provided for addi
 | timeoutSeconds | Seconds before attempt to fetch cache item is aborted | 5 |
 | indexMaxSizeMb | If provided, the size of the index will be monitored and cleaned so not to exceed given size |
 | indexMaxItems | If provided, the items in index will be monitored and cleaned so not to exceed given count |
-| indexConnectionName | Index monitoring uses SQL, if index is set up, this is the name of the connection to the created EF context | `"ResizerEFConnection"`
+| _(index database connection name)_ | (Not configurable) Index monitoring uses SQL, if index is set up, this is the name of the connection string to the created EF context | `"ResizerEFConnection"`
 | memoryStoreLimitMb | If provided, a memory cache is created in which recent cache items are kept (increased performance) |
 | memoryStorePollingInterval | If a memory cache exists, the memory cache will be cleaned in the given interval | `"00:04:01"` |
 
 ## Important requirements
+
+### Only compatible with the async pipeline
 
 Requires ImageResizer to be configured with `ImageResizer.AsyncInterceptModule`.
 If `ImageResizer.InterceptModule` is configured, replace all instances of this 
@@ -46,6 +48,10 @@ with this
 ```
  <add name="ImageResizingModule" type="ImageResizer.AsyncInterceptModule" />
 ```
+
+### EPiServerBlobReader support
+
+For this plugin to work with Optimizely (formerly EPiServer), at least version `7.3.0` of `ImageResizer.Plugins.EPiServerBlobReader` needs to be installed.
 
 ## Package maintainer
 
