@@ -70,7 +70,7 @@ with this
 
 ### EPiServerBlobReader support
 
-For this plugin to work with Optimizely (formerly EPiServer), at least version `7.3.0` of `ImageResizer.Plugins.EPiServerBlobReader` needs to be installed.
+For this plugin to work with Optimizely (formerly EPiServer), at least version `7.3.1` of `ImageResizer.Plugins.EPiServerBlobReader` needs to be installed.
 
 ### Advanced topics
 
