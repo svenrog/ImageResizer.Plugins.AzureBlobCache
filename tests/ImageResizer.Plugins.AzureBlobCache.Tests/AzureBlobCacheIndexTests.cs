@@ -105,6 +105,9 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
 
         private IndexContext CreateEfContext()
         {
+            if (string.IsNullOrEmpty(Config.DbContextConnectionString))
+                Assert.Inconclusive("Test requires a connection named 'ResizerEFConnection' with a connection string to a SQL database.");
+
             return new IndexContext();
         }
 
@@ -121,7 +124,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         private CloudBlobContainer InitializeContainer()
         {
             if (!CloudStorageAccount.TryParse(Config.BlobConnectionString, out CloudStorageAccount storageAccount))
-                throw new ArgumentException("connectionString could not be parsed");
+                Assert.Inconclusive("Test requires a connection named 'ResizerAzureBlobs' with a connection string to an Azure storage account.");
 
             var serviceClient = storageAccount.CreateCloudBlobClient();
             var container = serviceClient.GetContainerReference(Constants.IndexTestContainerName);

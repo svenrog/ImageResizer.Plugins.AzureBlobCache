@@ -158,17 +158,26 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
 
         private AzureBlobCache CreateDefaultBlobCache()
         {
+            if (string.IsNullOrEmpty(Config.BlobConnectionString))
+                Assert.Inconclusive("Test requires a connection named 'ResizerAzureBlobs' with a connection string to an Azure storage account.");
+
             return new AzureBlobCache(Config.BlobConnectionString, Constants.CacheTestContainerName);
         }
 
         private AzureBlobCache CreateIndexedBlobCache()
         {
+            if (string.IsNullOrEmpty(Config.BlobConnectionString))
+                Assert.Inconclusive("Test requires a connection named 'ResizerAzureBlobs' with a connection string to an Azure storage account.");
+
             var index = new AzureBlobCacheIndex(Config.BlobConnectionString, Constants.CacheTestContainerName, 10);
             return new AzureBlobCache(Config.BlobConnectionString, Constants.CacheTestContainerName, index, new NullCacheStore());
         }
 
         private AzureBlobCache CreateMemoryStoreBlobCache()
         {
+            if (string.IsNullOrEmpty(Config.BlobConnectionString))
+                Assert.Inconclusive("Test requires a connection named 'ResizerAzureBlobs' with a connection string to an Azure storage account.");
+
             var store = new AzureBlobCacheMemoryStore(200);
             return new AzureBlobCache(Config.BlobConnectionString, Constants.CacheTestContainerName, store);
         }

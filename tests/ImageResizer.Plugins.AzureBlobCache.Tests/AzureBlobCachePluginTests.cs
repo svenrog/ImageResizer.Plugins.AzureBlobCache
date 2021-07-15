@@ -107,6 +107,9 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
 
         private AzureBlobCachePlugin CreateBlobCachePlugin()
         {
+            if (string.IsNullOrEmpty(Config.BlobConnectionString))
+                Assert.Inconclusive("Test requires a connection named 'ResizerAzureBlobs' with a connection string to an Azure storage account.");
+
             var plugin = new TestableAzureBlobCachePlugin();
 
             plugin.ManualStart();
