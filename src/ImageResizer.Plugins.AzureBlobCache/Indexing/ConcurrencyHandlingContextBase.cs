@@ -2,6 +2,7 @@
 using System.Data.Entity;
 using System.Data.Entity.Infrastructure;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ImageResizer.Plugins.AzureBlobCache.Indexing
@@ -17,9 +18,9 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
             return Save(retries, (e) => e.Reload());
         }
 
-        public virtual Task<int> SaveChangesDatabaseWinsAsync(int retries = 1)
+        public virtual Task<int> SaveChangesDatabaseWinsAsync(CancellationToken cancellationToken = default, int retries = 1)
         {
-            return SaveAsync(retries, (e) => e.Reload());
+            return SaveAsync(retries, cancellationToken, (e) => e.Reload());
         }
 
         public virtual int SaveChangesClientWins(int retries = 1)
@@ -27,12 +28,12 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
             return Save(retries, (e) => e.OriginalValues.SetValues(e.GetDatabaseValues()));
         }
 
-        public virtual Task<int> SaveChangesClientWinsAsync(int retries = 1)
+        public virtual Task<int> SaveChangesClientWinsAsync(CancellationToken cancellationToken = default, int retries = 1)
         {
-            return SaveAsync(retries, (e) => e.OriginalValues.SetValues(e.GetDatabaseValues()));
+            return SaveAsync(retries, cancellationToken, (e) => e.OriginalValues.SetValues(e.GetDatabaseValues()));
         }
 
-        protected virtual async Task<int> SaveAsync(int retries, Action<DbEntityEntry> resolver)
+        protected virtual async Task<int> SaveAsync(int retries, CancellationToken cancellationToken, Action<DbEntityEntry> resolver)
         {
             DbUpdateConcurrencyException exception;
             bool saveFailed;

@@ -8,6 +8,7 @@ using Microsoft.WindowsAzure.Storage.Blob;
 using System;
 using System.Collections.Generic;
 using System.Data.Entity;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ImageResizer.Plugins.AzureBlobCache.Tests
@@ -94,13 +95,28 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
             var index = CreateIndexItemConstrained(100_000);
             var progress = (IRebuildProgress)null;
 
-            await index.RebuildAsync((p) => { progress = p; });
+            await index.RebuildAsync(progressCallback: (p) => { progress = p; });
             
             Assert.IsNotNull(progress);
             Assert.AreEqual(progress.CleanupPhase, CleanupPhase.Completed);
             Assert.AreEqual(progress.Errors, 0);
             Assert.IsTrue(progress.RemovedIndexItems > 0);
             Assert.IsTrue(progress.DiscoveredBlobs > 0);
+        }
+
+        [TestMethod]
+        public async Task IndexRebuildCanBeCancelled()
+        {
+            ClearIndex();
+
+            await InsertRandomIndexItems(3_000_000, 512_000, 50_000);
+
+            var initialCount = await GetContainerItems();
+            var index = CreateIndexItemConstrained(100_000);
+
+            var tokenSource = new CancellationTokenSource(200);
+
+            await Assert.ThrowsExceptionAsync<TaskCanceledException>(() => index.RebuildAsync(tokenSource.Token, (p) => { }));
         }
 
         private IndexContext CreateEfContext()

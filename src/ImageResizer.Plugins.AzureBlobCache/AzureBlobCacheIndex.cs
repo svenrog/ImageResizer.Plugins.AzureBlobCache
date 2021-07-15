@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Entity;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ImageResizer.Plugins.AzureBlobCache
@@ -95,12 +96,17 @@ namespace ImageResizer.Plugins.AzureBlobCache
             }
         }
 
-        public async Task RebuildAsync(Action<IRebuildProgress> progressCallback)
+        public Task RebuildAsync(Action<IRebuildProgress> progressCallback)
+        {
+            return RebuildAsync(default, progressCallback);
+        }
+
+        public async Task RebuildAsync(CancellationToken cancellationToken, Action<IRebuildProgress> progressCallback)
         {
             var indexItems = await GetIndexCount();
-            var storageEntities = await DiscoverAsync(indexItems, progressCallback);
+            var storageEntities = await DiscoverAsync(indexItems, progressCallback, cancellationToken);
 
-            await Synchronize(indexItems, storageEntities, progressCallback);
+            await Synchronize(indexItems, storageEntities, progressCallback, cancellationToken);
         }
 
         protected virtual IndexContext GetContext()
@@ -193,7 +199,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
             }
         }
         
-        protected virtual async Task<IList<IndexEntity>> DiscoverAsync(int indexItemCount, Action<IRebuildProgress> progressCallback)
+        protected virtual async Task<IList<IndexEntity>> DiscoverAsync(int indexItemCount, Action<IRebuildProgress> progressCallback, CancellationToken cancellationToken)
         {
             var progress = new IndexCleanupProgress
             {
@@ -209,7 +215,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
             do
             {
-                var segment = await _containerClient.Value.ListBlobsSegmentedAsync(token);
+                var segment = await _containerClient.Value.ListBlobsSegmentedAsync(token, cancellationToken);
 
                 foreach (var blob in segment.Results.OfType<CloudBlockBlob>())
                 {
@@ -231,13 +237,16 @@ namespace ImageResizer.Plugins.AzureBlobCache
                     progressCallback(progress);
                 }
 
+                if (cancellationToken.IsCancellationRequested)
+                    throw new TaskCanceledException("Cancellation requested");
+
                 token = segment.ContinuationToken;
             }
             while (token != null);
             return entities;
         }
 
-        protected virtual async Task Synchronize(int indexItemCount, IList<IndexEntity> existingEntities, Action<IRebuildProgress> progressCallback)
+        protected virtual async Task Synchronize(int indexItemCount, IList<IndexEntity> existingEntities, Action<IRebuildProgress> progressCallback, CancellationToken cancellationToken)
         {
             var comparer = new IndexEntityComparer();
             var progress = new IndexCleanupProgress
@@ -259,7 +268,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 try
                 {
                     context.IndexEntities.RemoveRange(itemsToRemoveFromIndex);
-                    progress.RemovedIndexItems = await context.SaveChangesDatabaseWinsAsync();
+                    progress.RemovedIndexItems = await context.SaveChangesDatabaseWinsAsync(cancellationToken);
                 }
                 catch (DataException)
                 {
@@ -282,6 +291,9 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 }
                 
                 progressCallback(progress);
+
+                if (cancellationToken.IsCancellationRequested)
+                    throw new TaskCanceledException("Cancellation requested");
             }
 
             progress.CleanupPhase = CleanupPhase.Completed;
