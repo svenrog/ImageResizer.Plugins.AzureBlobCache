@@ -4,7 +4,7 @@ If your solution is configured with an index (i.e. configured to limit the amoun
 
 To deal with that, we've provided a way to trigger what we call a _rebuild_ of the index, where a comparison is made between what's stored inside the SQL table and blob storage, and then results are resolved.
 
-In short this is how you get access and trigger it:
+In short: this is how you get access and trigger it:
 ```
 var cachePlugin = Config.Current.Plugins.Get<AzureBlobCachePlugin>();
 var index = cachePlugin.GetConfiguredIndex() as IRebuildableCacheIndex;
