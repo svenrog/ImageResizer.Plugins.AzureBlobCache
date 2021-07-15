@@ -8,7 +8,7 @@ In short: this is how you get access and trigger it;
 ```
 var cachePlugin = Config.Current.Plugins.Get<AzureBlobCachePlugin>();
 var index = cachePlugin.GetConfiguredIndex() as IRebuildableCacheIndex;
-await rebuildableIndex.RebuildAsync((progress) => {});
+await index.RebuildAsync((progress) => {});
 ```
 There are parameters for providing a cancellation token and a required callback with progress updates for UI scenarios.
 
