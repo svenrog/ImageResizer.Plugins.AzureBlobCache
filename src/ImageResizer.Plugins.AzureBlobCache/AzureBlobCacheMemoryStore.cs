@@ -41,7 +41,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
         private string GetCacheKey(Guid key)
         {
-            return $"ResizerBlobs-{key}";
+            return $"{key:D}";
         }
 
         private NameValueCollection GetConfig(int? cacheMemoryLimitMb, int? physicalMemoryLimitPercentage, string pollingInterval)

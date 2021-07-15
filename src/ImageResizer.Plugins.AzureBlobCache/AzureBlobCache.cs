@@ -136,6 +136,16 @@ namespace ImageResizer.Plugins.AzureBlobCache
             }
         }
 
+        public ICacheIndex GetIndex()
+        {
+            return _cacheIndex;
+        }
+
+        public ICacheStore GetStore()
+        {
+            return _cacheStore;
+        }
+
         private ICacheResult CreateResult(CacheQueryResult result, MemoryStream stream = null)
         {
             return new AzureBlobCacheQueryResult

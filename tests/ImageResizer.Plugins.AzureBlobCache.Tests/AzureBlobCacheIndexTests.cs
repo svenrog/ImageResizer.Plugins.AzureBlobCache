@@ -1,4 +1,7 @@
-﻿using ImageResizer.Plugins.AzureBlobCache.Indexing;
+﻿using ImageResizer.Caching.Core.Extensions;
+using ImageResizer.Caching.Core.Indexing;
+using ImageResizer.Plugins.AzureBlobCache.Indexing;
+using ImageResizer.Plugins.AzureBlobCache.Tests.Helpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
@@ -76,7 +79,28 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
                     var existingEntity = context.IndexEntities.Find(itemKey);
                     Assert.IsNotNull(existingEntity);
                 }
-            }            
+            }
+        }
+
+        [TestMethod]
+        public async Task IndexCanRebuild()
+        {
+            ClearIndex();
+
+            await UploadRandomBlobs(3_000_000, 512_000, 50_000);
+            await InsertRandomIndexItems(3_000_000, 512_000, 50_000);
+            
+            var initialCount = await GetContainerItems();
+            var index = CreateIndexItemConstrained(100_000);
+            var progress = (IRebuildProgress)null;
+
+            await index.RebuildAsync((p) => { progress = p; });
+            
+            Assert.IsNotNull(progress);
+            Assert.AreEqual(progress.CleanupPhase, CleanupPhase.Completed);
+            Assert.AreEqual(progress.Errors, 0);
+            Assert.IsTrue(progress.RemovedIndexItems > 0);
+            Assert.IsTrue(progress.DiscoveredBlobs > 0);
         }
 
         private IndexContext CreateEfContext()
@@ -109,18 +133,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
 
         private async Task InsertRandomIndexItems(long totalSize, int maxSize, int minSize)
         {
-            var sizeRemaining = totalSize;
-            var sizes = new List<int>();
-
-            while (sizeRemaining > 0)
-            {
-                var max = sizeRemaining > int.MaxValue ? maxSize : (int)Math.Min(maxSize, sizeRemaining);
-                var min = Math.Min(minSize, max);
-                var size = _randomizer.Next(min, max);
-
-                sizes.Add(size);
-                sizeRemaining -= size;
-            }
+            var sizes = GetRandomSizes(totalSize, maxSize, minSize);
 
             using (var context = CreateEfContext())
             {
@@ -138,6 +151,41 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
 
                 await context.SaveChangesDatabaseWinsAsync();
             }
+        }
+
+        private async Task UploadRandomBlobs(long totalSize, int maxSize, int minSize)
+        {
+            var sizes = GetRandomSizes(totalSize, maxSize, minSize);
+            var uploaded = new List<long>(sizes.Count);
+
+            await sizes.ForEachAsync(4, async (size) =>
+            {
+                var key = Guid.NewGuid();
+
+                using (var stream = DataHelper.GetStream(size))
+                {
+                    var blob = _containerClient.Value.GetBlockBlobReference($"{key:D}");
+                    await blob.UploadFromStreamAsync(stream);
+                }
+            });
+        }
+
+        private IList<int> GetRandomSizes(long totalSize, int maxSize, int minSize)
+        {
+            var sizeRemaining = totalSize;
+            var sizes = new List<int>();
+
+            while (sizeRemaining > 0)
+            {
+                var max = sizeRemaining > int.MaxValue ? maxSize : (int)Math.Min(maxSize, sizeRemaining);
+                var min = Math.Min(minSize, max);
+                var size = _randomizer.Next(min, max);
+
+                sizes.Add(size);
+                sizeRemaining -= size;
+            }
+
+            return sizes;
         }
 
         protected virtual void ClearIndex()

@@ -50,6 +50,9 @@
     <Compile Include="Identity\ICacheKeyGenerator.cs" />
     <Compile Include="Identity\MD5CacheKeyGenerator.cs" />
     <Compile Include="Indexing\ICacheIndex.cs" />
+    <Compile Include="Indexing\IRebuildableCacheIndex.cs" />
+    <Compile Include="Indexing\IRebuildPhase.cs" />
+    <Compile Include="Indexing\IRebuildProgress.cs" />
     <Compile Include="Indexing\NullCacheIndex.cs" />
     <Compile Include="ICacheStore.cs" />
     <Compile Include="NullCacheStore.cs" />

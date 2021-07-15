@@ -83,6 +83,7 @@
     <Compile Include="Handlers\ResponseTransformer.cs" />
     <Compile Include="Indexing\CleaningStrategy.cs" />
     <Compile Include="Indexing\ConcurrencyHandlingContextBase.cs" />
+    <Compile Include="Indexing\IndexCleanupProgress.cs" />
     <Compile Include="Indexing\IndexContext.cs" />
     <Compile Include="Indexing\IndexEntity.cs" />
     <Compile Include="Indexing\IndexEntityComparer.cs" />

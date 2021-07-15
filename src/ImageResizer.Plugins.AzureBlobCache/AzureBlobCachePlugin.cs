@@ -121,6 +121,16 @@ namespace ImageResizer.Plugins.AzureBlobCache
             throw new NotSupportedException("Only compatible with async pipeline, set 'ImageResizer.AsyncInterceptModule' instead of 'ImageResizer.InterceptModule' in Web.config");
         }
 
+        public virtual ICacheIndex GetConfiguredIndex()
+        {
+            if (_cacheProvider is AzureBlobCache azureCacheProvider)
+            {
+                return azureCacheProvider.GetIndex();
+            }
+
+            return null;
+        }
+
         protected virtual void Start()
         {
             _cacheProvider = new AzureBlobCache(GetConnection(ConnectionName), ContainerName, GetCacheIndex(), GetCacheStore());

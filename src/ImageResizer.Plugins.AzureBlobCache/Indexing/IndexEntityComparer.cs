@@ -10,8 +10,6 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
             if (x == null || y == null) return true;
 
             if (x.Key.Equals(y.Key) == false) return false;
-            if (x.Modified.Equals(y.Modified) == false) return false;
-
             return true;
         }
 

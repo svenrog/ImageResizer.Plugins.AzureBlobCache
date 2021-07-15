@@ -5,13 +5,14 @@ using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.Entity;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace ImageResizer.Plugins.AzureBlobCache
 {
-    public class AzureBlobCacheIndex : ICacheIndex
+    public class AzureBlobCacheIndex : IRebuildableCacheIndex
     {
         private readonly string _connectionString;
         private readonly string _containerName;
@@ -86,12 +87,20 @@ namespace ImageResizer.Plugins.AzureBlobCache
                     var pruned = false;
 
                     if (_pruneCounter++ % _pruneInterval == 0)
-                        pruned = await Prune();
+                        pruned = await Prune(_pruneSize);
 
                     if (!pruned)
                         await context.SaveChangesDatabaseWinsAsync();
                 }
             }
+        }
+
+        public async Task RebuildAsync(Action<IRebuildProgress> progressCallback)
+        {
+            var indexItems = await GetIndexCount();
+            var storageEntities = await DiscoverAsync(indexItems, progressCallback);
+
+            await Synchronize(indexItems, storageEntities, progressCallback);
         }
 
         protected virtual IndexContext GetContext()
@@ -117,10 +126,25 @@ namespace ImageResizer.Plugins.AzureBlobCache
             catch (InvalidOperationException)
             {
                 return 0;
-            }            
+            }
         }
 
-        protected virtual async Task<bool> Prune()
+        protected virtual async Task<int> GetIndexCount()
+        {
+            try
+            {
+                using (var context = GetContext())
+                {
+                    return await context.IndexEntities.CountAsync();
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                return 0;
+            }
+        }
+
+        protected virtual async Task<bool> Prune(int maxItems)
         {
             var removals = new List<IndexEntity>();
             var removed = new List<IndexEntity>();
@@ -132,7 +156,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
             using (var context = GetContext())
             {
                 var candidates = await context.IndexEntities.OrderBy(x => x.Modified)
-                                                            .Take(_pruneSize)
+                                                            .Take(maxItems)
                                                             .ToListAsync();
 
                 foreach (var candidate in candidates)
@@ -168,8 +192,103 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 return true;
             }
         }
+        
+        protected virtual async Task<IList<IndexEntity>> DiscoverAsync(int indexItemCount, Action<IRebuildProgress> progressCallback)
+        {
+            var progress = new IndexCleanupProgress
+            {
+                CleanupPhase = CleanupPhase.Discovery,
+                ItemsInIndex = indexItemCount
+            };
 
-        private Task<bool> DeleteBlob(Guid key)
+            progressCallback(progress);
+
+            var entities = new List<IndexEntity>(indexItemCount);
+
+            BlobContinuationToken token = null;
+
+            do
+            {
+                var segment = await _containerClient.Value.ListBlobsSegmentedAsync(token);
+
+                foreach (var blob in segment.Results.OfType<CloudBlockBlob>())
+                {
+                    if (!blob.Properties.LastModified.HasValue)
+                        continue;
+
+                    var parsed = Guid.TryParseExact(blob.Name, "D", out Guid guid);
+                    if (!parsed)
+                        continue;
+
+                    var dateTime = blob.Properties.LastModified.Value.UtcDateTime;
+                    var size = blob.Properties.Length;
+
+                    var item = new IndexEntity(guid, dateTime, size);
+
+                    entities.Add(item);
+
+                    progress.DiscoveredBlobs += 1;
+                    progressCallback(progress);
+                }
+
+                token = segment.ContinuationToken;
+            }
+            while (token != null);
+            return entities;
+        }
+
+        protected virtual async Task Synchronize(int indexItemCount, IList<IndexEntity> existingEntities, Action<IRebuildProgress> progressCallback)
+        {
+            var comparer = new IndexEntityComparer();
+            var progress = new IndexCleanupProgress
+            {
+                CleanupPhase = CleanupPhase.Synchronization,
+                ItemsInIndex = indexItemCount,
+                DiscoveredBlobs = existingEntities.Count,
+            };
+
+            progressCallback(progress);
+
+            IList<IndexEntity> itemsInIndex;
+
+            using (var context = GetContext())
+            {
+                itemsInIndex = await context.IndexEntities.ToListAsync();
+                var itemsToRemoveFromIndex = itemsInIndex.Except(existingEntities, comparer);
+
+                try
+                {
+                    context.IndexEntities.RemoveRange(itemsToRemoveFromIndex);
+                    progress.RemovedIndexItems = await context.SaveChangesDatabaseWinsAsync();
+                }
+                catch (DataException)
+                {
+                    progress.Errors++;
+                }
+            }
+
+            var itemsToAddToIndex = existingEntities.Except(itemsInIndex, comparer);
+
+            foreach (var item in itemsToAddToIndex)
+            {
+                try
+                {
+                    await NotifyAddedAsync(item.Key, item.Modified, item.Size);
+                    progress.AddedIndexItems++;
+                }
+                catch (DataException)
+                {
+                    progress.Errors++;
+                }
+                
+                progressCallback(progress);
+            }
+
+            progress.CleanupPhase = CleanupPhase.Completed;
+            progressCallback(progress);
+        }
+
+        protected virtual Task<bool> DeleteBlob(Guid key)
         {
             var reference = _containerClient.Value.GetBlockBlobReference($"{key:D}");
             return reference.DeleteIfExistsAsync();
@@ -186,6 +305,6 @@ namespace ImageResizer.Plugins.AzureBlobCache
             container.CreateIfNotExists();
 
             return container;
-        }
+        }       
     }
 }
