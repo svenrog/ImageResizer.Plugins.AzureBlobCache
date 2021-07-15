@@ -1,4 +1,6 @@
-﻿using ImageResizer.Plugins.AzureBlobCache.Tests.Models;
+﻿using ImageResizer.Configuration.Issues;
+using ImageResizer.Configuration.Xml;
+using ImageResizer.Plugins.AzureBlobCache.Tests.Models;
 using ImageResizer.Plugins.AzureBlobCache.Tests.Testables;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
@@ -6,6 +8,7 @@ using System.Collections.Specialized;
 using System.IO;
 using System.Threading.Tasks;
 using System.Web;
+using ResizerConfig = ImageResizer.Configuration.Config;
 
 namespace ImageResizer.Plugins.AzureBlobCache.Tests
 {
@@ -52,6 +55,26 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
                     Assert.ThrowsException<NotSupportedException>(() => plugin.Process(context, args));
                 }
             }
+        }
+
+        [TestMethod]
+        public void CanGetRebuildableIndex()
+        {
+            var config = ResizerConfig.Current;
+
+            var originalConfig = config.getConfigXml();
+            var issueSink = new IssueSink(null);
+            var currentConfig = "<resizer><azureBlobCache indexMaxItems=\"200\" /></resizer>";
+
+            config.setConfigXml(Node.FromXmlFragment(currentConfig, issueSink));
+            config.Plugins.Install(CreateBlobCachePlugin());
+            config.setConfigXml(originalConfig);
+
+            var configuredPlugin = config.Plugins.Get<AzureBlobCachePlugin>();
+            var configuredIndex = configuredPlugin.GetConfiguredIndex();
+
+            Assert.IsNotNull(configuredIndex);
+            Assert.IsInstanceOfType(configuredIndex, typeof(AzureBlobCacheIndex));
         }
 
         private TestResponseArgs CreateArgs(string path, Stream stream)
