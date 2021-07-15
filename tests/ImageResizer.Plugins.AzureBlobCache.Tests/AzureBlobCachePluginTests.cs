@@ -1,4 +1,5 @@
-﻿using ImageResizer.Configuration.Issues;
+﻿using ImageResizer.Caching.Core.Indexing;
+using ImageResizer.Configuration.Issues;
 using ImageResizer.Configuration.Xml;
 using ImageResizer.Plugins.AzureBlobCache.Tests.Models;
 using ImageResizer.Plugins.AzureBlobCache.Tests.Testables;
@@ -74,7 +75,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
             var configuredIndex = configuredPlugin.GetConfiguredIndex();
 
             Assert.IsNotNull(configuredIndex);
-            Assert.IsInstanceOfType(configuredIndex, typeof(AzureBlobCacheIndex));
+            Assert.IsInstanceOfType(configuredIndex, typeof(IRebuildableCacheIndex));
         }
 
         private TestResponseArgs CreateArgs(string path, Stream stream)
