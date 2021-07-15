@@ -72,6 +72,10 @@ with this
 
 For this plugin to work with Optimizely (formerly EPiServer), at least version `7.3.0` of `ImageResizer.Plugins.EPiServerBlobReader` needs to be installed.
 
+### Advanced topics
+
+- [Index maintenance](/docs/indexmaintenance.md)
+
 ## Package maintainer
 
 https://github.com/svenrog
