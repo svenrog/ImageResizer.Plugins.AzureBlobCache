@@ -75,7 +75,7 @@ For this plugin to work with Optimizely (formerly EPiServer), at least version `
 ### Advanced topics
 
 - [Index maintenance](/docs/indexmaintenance.md)
-- [Client caching missing from async pipeline](/docs/clientcache.md)
+- [Client caching missing from async pipeline](/docs/clientcaching.md)
 
 ## Package maintainer
 
