@@ -10,7 +10,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
         private readonly Func<Task> _task;
         private readonly Timer _timer;
         private readonly Queue<DateTime> _workQueue;
-        private readonly int _queueTaskNth;
+        private readonly int _queueTaskEvery;
         private readonly int _queueMaxItems;
         
         private int _taskCalls;
@@ -32,14 +32,14 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
                 Interval = taskInterval.TotalMilliseconds
             };
             
-            _queueTaskNth = queueTaskEvery;
+            _queueTaskEvery = queueTaskEvery;
             _queueMaxItems = 10000;
             _taskCalls = 0;
         }
 
         public bool Notify()
         {
-            if (_taskCalls++ % _queueTaskNth != 0)
+            if (_taskCalls++ % _queueTaskEvery != 0)
                 return false;
 
             if (_workQueue.Count > _queueMaxItems)
@@ -66,7 +66,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
                 return;
 
             _timer.Stop();
-            _timer.Elapsed -= Timer_Elapsed;
+            _timer.Elapsed -= new ElapsedEventHandler(Timer_Elapsed);
             _started = false;
         }
 
