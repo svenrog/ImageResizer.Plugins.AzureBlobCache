@@ -49,11 +49,10 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 throw new ArgumentNullException($"Both {nameof(containerMaxSizeInMb)} and {nameof(containerMaxItems)} cannot be null.");
             }
 
-            _containerClient = new Lazy<CloudBlobContainer>(containerClientFactory ?? InitializeContainer);
-
             TimeSpan.TryParse(workerPollingInterval ?? "00:05:00", out var workerInterval);
 
             _indexWorker = new IndexWorker(() => TrimIndex(100), workerInterval, 25);
+            _containerClient = new Lazy<CloudBlobContainer>(containerClientFactory ?? InitializeContainer);
         }
 
         public virtual async Task NotifyAddedAsync(Guid guid, DateTime modified, long size)
@@ -84,7 +83,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 {
                     await context.SaveChangesDatabaseWinsAsync();
 
-                    _indexWorker.Notify();
+                    _indexWorker.Poll();
                 }
             }
         }
