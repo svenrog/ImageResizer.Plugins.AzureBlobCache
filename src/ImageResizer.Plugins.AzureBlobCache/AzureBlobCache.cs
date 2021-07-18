@@ -97,25 +97,20 @@ namespace ImageResizer.Plugins.AzureBlobCache
             var blob = GetBlob(key);
             var writeLock = _synchronizer[key];
 
-            await writeLock.WaitAsync(cancellationToken);
-
             try
             {
+                await writeLock.WaitAsync(cancellationToken);
+
                 using (var stream = new MemoryStream(4096))
                 {
                     await asyncWriter(stream);
 
                     try
                     {
-                        if (cancellationToken.IsCancellationRequested)
-                            throw new OperationCanceledException("Task took too long");
-
                         stream.Seek(0, SeekOrigin.Begin);
 
                         await blob.UploadFromStreamAsync(stream, cancellationToken)
                                  .ConfigureAwait(false);
-
-                        stream.Seek(0, SeekOrigin.Begin);
 
                         var result = CreateResult(CacheQueryResult.Hit, stream);
 
@@ -128,10 +123,20 @@ namespace ImageResizer.Plugins.AzureBlobCache
                     }
                     catch (OperationCanceledException)
                     {
-                        stream.Seek(0, SeekOrigin.Begin);
+                        // Operation was cancelled while uploading or modifying index
+                        // In this case, the image has been resized and should be returned
+                        // Not returning it will cause another resize
+
                         return CreateResult(CacheQueryResult.Failed, stream);
                     }
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Operation was cancelled while waiting for another operation
+                // In this case, the image has not been resized yet
+
+                return CreateResult(CacheQueryResult.Failed);
             }
             finally
             {
@@ -152,6 +157,8 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
         private ICacheResult CreateResult(CacheQueryResult result, MemoryStream stream = null)
         {
+            stream?.Seek(0, SeekOrigin.Begin);
+
             return new AzureBlobCacheQueryResult
             {
                 Result = result,
