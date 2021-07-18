@@ -10,7 +10,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests.Testables
             Start();
         }
 
-        protected override void RemapHitResponse(HttpContext context, IAsyncResponsePlan plan, byte[] data)
+        protected override void RemapContentResponse(HttpContext context, IAsyncResponsePlan plan, byte[] data)
         {
             var rewriter = new ResponseTransformer(data, plan.EstimatedContentType);
 

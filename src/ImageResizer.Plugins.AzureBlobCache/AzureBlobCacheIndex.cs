@@ -1,5 +1,6 @@
 ﻿using ImageResizer.Caching.Core.Extensions;
 using ImageResizer.Caching.Core.Indexing;
+using ImageResizer.Caching.Core.Operation;
 using ImageResizer.Plugins.AzureBlobCache.Indexing;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
@@ -13,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace ImageResizer.Plugins.AzureBlobCache
 {
-    public class AzureBlobCacheIndex : IRebuildableCacheIndex
+    public class AzureBlobCacheIndex : IRebuildableCacheIndex, IStartable, IStoppable, IDisposable
     {
         private readonly string _connectionString;
         private readonly string _containerName;
@@ -21,19 +22,17 @@ namespace ImageResizer.Plugins.AzureBlobCache
         private readonly long _containerMaxSize;
         private readonly CleaningStrategy _cleanupStrategy;
         private readonly Lazy<CloudBlobContainer> _containerClient;
+        private readonly IndexWorker _indexWorker;
 
-        private readonly int _pruneSize;
-        private readonly int _pruneInterval = 10;
+        private bool _disposed;
 
-        private volatile int _pruneCounter = 0;
-
-        public AzureBlobCacheIndex(string connectionString, string containerName, int? containerMaxSizeInMb = null, int? containerMaxItems = null, string efConnectionName = null) : this(containerMaxSizeInMb, containerMaxItems, efConnectionName: efConnectionName)
+        public AzureBlobCacheIndex(string connectionString, string containerName, int? containerMaxSizeInMb = null, int? containerMaxItems = null, string workerPollingInterval = null) : this(containerMaxSizeInMb, containerMaxItems, workerPollingInterval)
         {
             _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
             _containerName = containerName ?? throw new ArgumentNullException(nameof(containerName));    
         }
 
-        public AzureBlobCacheIndex(int? containerMaxSizeInMb = null, int? containerMaxItems = null, Func<CloudBlobContainer> containerClientFactory = null, string efConnectionName = null)
+        public AzureBlobCacheIndex(int? containerMaxSizeInMb = null, int? containerMaxItems = null, string workerPollingInterval = null, Func<CloudBlobContainer> containerClientFactory = null)
         {
             if (containerMaxSizeInMb.HasValue)
             {
@@ -52,9 +51,9 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
             _containerClient = new Lazy<CloudBlobContainer>(containerClientFactory ?? InitializeContainer);
 
-            _pruneSize = 100;
-            _pruneInterval = 50;
-            _pruneCounter = 0;
+            TimeSpan.TryParse(workerPollingInterval ?? "00:05:00", out var workerInterval);
+
+            _indexWorker = new IndexWorker(() => TrimIndex(100), workerInterval, 25);
         }
 
         public virtual async Task NotifyAddedAsync(Guid guid, DateTime modified, long size)
@@ -71,27 +70,21 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 if (existingEntity == null)
                 {
                     var newEntity = new IndexEntity(guid, modified, size);
-                    
                     context.IndexEntities.Add(newEntity);
-
                     updatedIndex = true;
                 }
                 else if (existingEntity.Size != size)
                 {
                     existingEntity.Size = size;
-                    existingEntity.Modified = modified;                    
+                    existingEntity.Modified = modified; 
                     updatedIndex = true;
                 }
 
                 if (updatedIndex)
                 {
-                    var pruned = false;
+                    await context.SaveChangesDatabaseWinsAsync();
 
-                    if (_pruneCounter++ % _pruneInterval == 0)
-                        pruned = await Prune(_pruneSize);
-
-                    if (!pruned)
-                        await context.SaveChangesDatabaseWinsAsync();
+                    _indexWorker.Notify();
                 }
             }
         }
@@ -107,6 +100,35 @@ namespace ImageResizer.Plugins.AzureBlobCache
             var storageEntities = await DiscoverAsync(indexItems, progressCallback, cancellationToken);
 
             await Synchronize(indexItems, storageEntities, progressCallback, cancellationToken);
+        }
+
+        public virtual void Start()
+        {
+            _indexWorker.Start();
+        }
+
+        public virtual void Stop()
+        {
+            _indexWorker.Stop();
+        }
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    _indexWorker.Dispose();
+                }
+
+                _disposed = true;
+            }
         }
 
         protected virtual IndexContext GetContext()
@@ -150,7 +172,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
             }
         }
 
-        protected virtual async Task<bool> Prune(int maxItems)
+        protected virtual async Task<bool> TrimIndex(int maxItems)
         {
             var removals = new List<IndexEntity>();
             var removed = new List<IndexEntity>();

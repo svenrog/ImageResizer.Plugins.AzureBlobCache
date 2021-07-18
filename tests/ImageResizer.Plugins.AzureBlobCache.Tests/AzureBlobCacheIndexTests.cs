@@ -35,14 +35,20 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
             await InsertRandomIndexItems(uploadSize, 512_000, 10_000);
 
             var index = CreateIndexSizeConstrained(1);
+            
+            index.Start();
+
             var initialCount = await GetContainerItems();
 
             var testKey = Guid.NewGuid();
             var testSize = 512_000;
 
             await index.NotifyAddedAsync(testKey, DateTime.UtcNow, testSize);
+            Thread.Sleep(3000);
 
             var currentCount = await GetContainerItems();
+
+            index.Stop();
 
             Assert.IsTrue(currentCount > 0);
             Assert.IsTrue(initialCount >= currentCount);
@@ -58,8 +64,9 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
             var initialCount = await GetContainerItems();
             var index = CreateIndexItemConstrained(initialCount);
             var insertCount = 10;
-            
             var itemsAdded = new List<Guid>();
+
+            index.Start();
 
             for (var i = 0; i < insertCount; i++)
             {
@@ -67,11 +74,15 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
                 await index.NotifyAddedAsync(item, DateTime.UtcNow, 512_000);
                 itemsAdded.Add(item);
             }
-            
+
+            Thread.Sleep(3000);
+
             var currentCount = await GetContainerItems();
 
+            index.Stop();
+
             Assert.IsTrue(currentCount > 0);
-            Assert.IsTrue(currentCount <= initialCount + insertCount);
+            Assert.IsTrue(currentCount < initialCount + insertCount);
 
             using (var context = CreateEfContext())
             {
@@ -129,12 +140,12 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
 
         private AzureBlobCacheIndex CreateIndexSizeConstrained(int indexSizeConstraintMb)
         {
-            return new AzureBlobCacheIndex(containerMaxSizeInMb: indexSizeConstraintMb, containerClientFactory: () => _containerClient.Value);
+            return new AzureBlobCacheIndex(indexSizeConstraintMb, null, "00:00:00.1", () => _containerClient.Value);
         }
 
         private AzureBlobCacheIndex CreateIndexItemConstrained(int indexItemConstraint)
         {
-            return new AzureBlobCacheIndex(containerMaxItems: indexItemConstraint, containerClientFactory: () => _containerClient.Value);
+            return new AzureBlobCacheIndex(null, indexItemConstraint, "00:00:00.1", () => _containerClient.Value);
         }
 
         private CloudBlobContainer InitializeContainer()

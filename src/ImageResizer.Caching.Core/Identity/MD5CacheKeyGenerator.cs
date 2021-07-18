@@ -18,8 +18,11 @@ namespace ImageResizer.Caching.Core.Identity
 
         public Guid Generate(string path)
         {
-            var bytes = _encoding.GetBytes(path);
-            return new Guid(MD5.Create().ComputeHash(bytes));
+            using (var hasher = MD5.Create())
+            {
+                var bytes = _encoding.GetBytes(path);
+                return new Guid(hasher.ComputeHash(bytes));
+            }
         }
 
         public Guid Generate(string path, string extension)

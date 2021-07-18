@@ -88,6 +88,7 @@
     <Compile Include="Indexing\IndexEntity.cs" />
     <Compile Include="Indexing\IndexEntityComparer.cs" />
     <Compile Include="Indexing\IndexMigrationConfiguration.cs" />
+    <Compile Include="Indexing\IndexWorker.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Handlers\MemoryCacheHandler.cs" />
   </ItemGroup>

@@ -41,7 +41,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CacheQueryResult.cs" />
-    <Compile Include="Exceptions\CacheTimeoutException.cs" />
     <Compile Include="Extensions\EnumerableExtensions.cs" />
     <Compile Include="Handlers\AsyncHttpHandlerBase.cs" />
     <Compile Include="Handlers\TaskWrapperAsyncResult.cs" />
@@ -56,8 +55,9 @@
     <Compile Include="Indexing\NullCacheIndex.cs" />
     <Compile Include="ICacheStore.cs" />
     <Compile Include="NullCacheStore.cs" />
+    <Compile Include="Operation\IStartable.cs" />
+    <Compile Include="Operation\IStoppable.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Queueing\PriorityQueue.cs" />
     <Compile Include="Threading\IThreadSynchronizer.cs" />
     <Compile Include="Threading\SemaphoreSynchronizer.cs" />
     <Compile Include="Threading\ThreadSynchronizerBase.cs" />

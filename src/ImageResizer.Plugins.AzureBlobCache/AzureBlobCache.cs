@@ -97,20 +97,23 @@ namespace ImageResizer.Plugins.AzureBlobCache
             var blob = GetBlob(key);
             var writeLock = _synchronizer[key];
 
+            await writeLock.WaitAsync(cancellationToken);
+
             try
             {
-                await writeLock.WaitAsync(cancellationToken);
-
-                try
+                using (var stream = new MemoryStream(4096))
                 {
-                    using (var stream = new MemoryStream(4096))
+                    await asyncWriter(stream);
+
+                    try
                     {
-                        await asyncWriter(stream);
+                        if (cancellationToken.IsCancellationRequested)
+                            throw new OperationCanceledException("Task took too long");
 
                         stream.Seek(0, SeekOrigin.Begin);
 
                         await blob.UploadFromStreamAsync(stream, cancellationToken)
-                                  .ConfigureAwait(false);
+                                 .ConfigureAwait(false);
 
                         stream.Seek(0, SeekOrigin.Begin);
 
@@ -123,16 +126,17 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
                         return result;
                     }
-                }
-                finally
-                {
-                    writeLock.Release();
-                    _synchronizer.TryRemove(key);
+                    catch (OperationCanceledException)
+                    {
+                        stream.Seek(0, SeekOrigin.Begin);
+                        return CreateResult(CacheQueryResult.Failed, stream);
+                    }
                 }
             }
-            catch (OperationCanceledException)
+            finally
             {
-                return CreateResult(CacheQueryResult.Failed);
+                writeLock.Release();
+                _synchronizer.TryRemove(key);
             }
         }
 

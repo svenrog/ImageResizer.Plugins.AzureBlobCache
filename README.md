@@ -48,8 +48,9 @@ This element has a list of attributes that can be provided for detailed control 
 | timeoutSeconds | Seconds before attempt to fetch cache item is aborted | 5 |
 | memoryStoreLimitMb | If provided, a memory cache is created in which recent cache items are kept (increased performance) |
 | memoryStorePollingInterval | If a memory cache exists, the memory cache will be cleaned in the given interval | `"00:04:01"` |
-| indexMaxSizeMb | If provided, the size of the index will be monitored and cleaned so not to exceed given size |
-| indexMaxItems | If provided, the items in index will be monitored and cleaned so not to exceed given count |
+| indexMaxSizeMb | If provided, the size of the index will be monitored and cleaned as not to exceed given size |
+| indexMaxItems | If provided, the items in index will be monitored and cleaned as not to exceed given count |
+| indexPollingInterval | The interval in which the index max size should be checked | `"00:05:00"`
 | _(index database connection name)_ | (Not configurable) Index monitoring uses SQL, if index is set up, this is the name of the connection string to the created EF context | `"ResizerEFConnection"`
 
 ## Important requirements
