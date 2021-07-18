@@ -169,6 +169,9 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
             if (string.IsNullOrEmpty(Config.BlobConnectionString))
                 Assert.Inconclusive("Test requires a connection named 'ResizerAzureBlobs' with a connection string to an Azure storage account.");
 
+            if (string.IsNullOrEmpty(Config.DbContextConnectionString))
+                Assert.Inconclusive("Test requires a connection named 'ResizerEFConnection' with a connection string to an Azure storage account.");
+
             var index = new AzureBlobCacheIndex(Config.BlobConnectionString, Constants.CacheTestContainerName, 10);
             return new AzureBlobCache(Config.BlobConnectionString, Constants.CacheTestContainerName, index, new NullCacheStore());
         }
