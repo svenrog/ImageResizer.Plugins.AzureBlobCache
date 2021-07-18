@@ -13,9 +13,10 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
         private readonly int _queueTaskEvery;
         private readonly int _queueMaxItems;
         
-        private int _taskCalls;
+        private int _polls;
         private bool _started;
         private bool _disposed;
+        private bool _working;
 
         /// <summary>
         /// Performs a task after a specific amount of time and updates are performed.
@@ -34,12 +35,12 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
             
             _queueTaskEvery = queueTaskEvery;
             _queueMaxItems = 10000;
-            _taskCalls = 0;
+            _polls = 0;
         }
 
-        public bool Notify()
+        public bool Poll()
         {
-            if (_taskCalls++ % _queueTaskEvery != 0)
+            if (_polls++ % _queueTaskEvery != 0)
                 return false;
 
             if (_workQueue.Count > _queueMaxItems)
@@ -56,7 +57,6 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
 
             _timer.Elapsed += new ElapsedEventHandler(Timer_Elapsed);
             _timer.Start();
-
             _started = true;
         }
 
@@ -102,13 +102,15 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
 
         private async Task OnTimerElapsed(object sender, ElapsedEventArgs e)
         {
-            if (!_started)
+            if (!_started || _working)
                 return;
 
             if (_workQueue.Count < 1)
                 return;
 
             var requestedTime = _workQueue.Dequeue();
+
+            _working = true;
 
             try
             {
@@ -117,6 +119,10 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
             catch (Exception)
             {
                 _workQueue.Enqueue(requestedTime);
+            }
+            finally
+            {
+                _working = false;
             }
         }
     }
