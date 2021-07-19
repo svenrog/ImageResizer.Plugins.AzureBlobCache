@@ -162,13 +162,13 @@ namespace ImageResizer.Plugins.AzureBlobCache
             }
             catch (SemaphoreFullException)
             {
-                // Under really heavy load multiple threads will be in here in the same context.
+                // Under really heavy load, multiple threads will be in here in the same context.
                 // One might be just one step ahead of the other, trying to release the semaphore.
                 return false;
             }
             catch (ObjectDisposedException)
             {
-                // Under really heavy load multiple threads will be trying to remove unused semaphores.
+                // Under really heavy load, multiple threads will be trying to remove unused semaphores.
                 // This may lead to a thread lagging a bit behind trying to release an already disposed semaphore.
                 return false;
             }
