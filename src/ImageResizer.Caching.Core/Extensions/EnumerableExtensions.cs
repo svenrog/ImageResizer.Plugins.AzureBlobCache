@@ -15,7 +15,7 @@ namespace ImageResizer.Caching.Core.Extensions
         /// </summary>
         public static Task ForEachAsync<TSource, TResult>(this IEnumerable<TSource> source, int maxParallelism, Func<TSource, Task<TResult>> taskSelector, Action<TSource, TResult> resultProcessor)
         {
-            var waitHandle = new SemaphoreSlim(maxParallelism);
+            var waitHandle = new SemaphoreSlim(maxParallelism, maxParallelism);
             return Task.WhenAll(
                 from item in source
                 select ProcessAsync(item, taskSelector, resultProcessor, waitHandle));
@@ -23,7 +23,7 @@ namespace ImageResizer.Caching.Core.Extensions
 
         public static Task ForEachAsync<TSource>(this IEnumerable<TSource> source, int maxParallelism, Func<TSource, Task> taskProcessor)
         {
-            var waitHandle = new SemaphoreSlim(maxParallelism);
+            var waitHandle = new SemaphoreSlim(maxParallelism, maxParallelism);
             return Task.WhenAll(
                 from item in source
                 select ProcessAsync(item, taskProcessor, waitHandle));

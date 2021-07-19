@@ -54,11 +54,7 @@ namespace ImageResizer.Caching.Core.Threading
         {
             lock (KeyLock)
             {
-                var value = Index[key];
-
-                Dispose(value);
-
-                Index.Remove(key);
+                ExecuteRemove(key);
             }
         }
 
@@ -73,21 +69,31 @@ namespace ImageResizer.Caching.Core.Threading
             lock (KeyLock)
             {
                 var value = Index[key];
+
                 if (value.CurrentCount < SemaphoreMaxCount)
                 {
                     return false;
                 }
-            }
 
-            try
-            {
-                Remove(key);
-                return true;
+                try
+                {
+                    ExecuteRemove(key);
+                    return true;
+                }
+                catch (Exception)
+                {
+                    return false;
+                }
             }
-            catch (Exception)
-            {
-                return false;
-            }
+        }
+
+        protected virtual void ExecuteRemove(TKey key)
+        {
+            var value = Index[key];
+
+            Dispose(value);
+
+            Index.Remove(key);
         }
 
         protected override SemaphoreSlim Create(TKey key)

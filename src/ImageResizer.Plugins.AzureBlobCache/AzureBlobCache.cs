@@ -141,7 +141,9 @@ namespace ImageResizer.Plugins.AzureBlobCache
             }
             finally
             {
-                writeLock.Release();
+                if (writeLock.CurrentCount < 1)
+                    writeLock.Release();
+
                 _synchronizer.TryRemove(key);
             }
         }
