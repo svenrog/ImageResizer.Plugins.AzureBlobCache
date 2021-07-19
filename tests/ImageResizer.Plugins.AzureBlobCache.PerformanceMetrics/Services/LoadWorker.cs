@@ -20,6 +20,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics.Services
         private readonly Stopwatch _stopwatch;
         private readonly Random _randomizer;
         private readonly int _threads;
+        private readonly bool _debug;
 
         private bool _started;
         private bool _disposed;
@@ -29,7 +30,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics.Services
         /// </summary>
         /// <param name="task"></param>
         /// <param name="taskInterval">The interval in which to check the queue</param>
-        public LoadWorker(IList<PageInstructions> pages, int threads, TimeSpan taskInterval, Func<string, Instructions, Task<CacheQueryResult>> task)
+        public LoadWorker(IList<PageInstructions> pages, int threads, TimeSpan taskInterval, Func<string, Instructions, Task<CacheQueryResult>> task, bool debug = false)
         {
             _pages = pages ?? throw new ArgumentNullException(nameof(pages));
             _task = task ?? throw new ArgumentNullException(nameof(task));
@@ -41,6 +42,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics.Services
             _randomizer = new Random();
             _dataPoints = new List<DataPoint>();
             _threads = threads;
+            _debug = debug;
             _stopwatch = new Stopwatch();
             _timer = new Timer
             {
@@ -146,8 +148,11 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics.Services
             {
                 taskResult = CacheQueryResult.Fatal;
 
-                Console.WriteLine($"Fatal exception in task: {ex.Message}");
-                Console.WriteLine($"---> {ex.StackTrace}");
+                if (_debug)
+                {
+                    Console.WriteLine($"Fatal exception in task: {ex.Message}");
+                    Console.WriteLine($"{ex.StackTrace}");
+                }                    
             }
 
             watch.Stop();

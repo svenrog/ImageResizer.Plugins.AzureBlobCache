@@ -27,7 +27,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
         [Option('o', "output", Required = true, HelpText = "Path to output to.")]
         public string Output { get; set; }
 
-        [Option('r', "requests", Required = false, Default = 60, HelpText = "Amount of requests to simulate (per second).")]
+        [Option('r', "requests", Required = false, Default = 10, HelpText = "Amount of requests to simulate (per second).")]
         public int Requests { get; set; }
 
         [Option('p', "period", Required = false, Default = "00:01:00", HelpText = "Testing period")]
@@ -35,6 +35,9 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
 
         [Option('b', "baseline", Required = false, Default = false, HelpText = "Testing period")]
         public bool Baseline { get; set; }
+
+        [Option('d', "debug", Required = false, Default = false, HelpText = "Testing period")]
+        public bool Debug { get; set; }
     }
 
     class Program
@@ -153,7 +156,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
             {
                 var requestKey = $"{path}|{instructions}";
                 var cacheKey = keyGenerator.Generate(requestKey);
-                var tokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                var tokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(7));
                 
                 var cacheResult = await provider.GetAsync(cacheKey, tokenSource.Token);
                 if (cacheResult.Result == CacheQueryResult.Miss)
@@ -280,6 +283,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
 
             return Directory.EnumerateFiles(path, "*.*", SearchOption.AllDirectories)
                             .Where(x => filter.Contains(Path.GetExtension(x)))
+                            .Where(x => x.IndexOf("_thumbnail", StringComparison.InvariantCultureIgnoreCase) < 0)
                             .ToList();
         }
 
