@@ -18,6 +18,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
         private readonly IThreadSynchronizer<Guid, SemaphoreSlim> _synchronizer;
         private readonly ICacheIndex _cacheIndex;
         private readonly ICacheStore _cacheStore;
+        private readonly bool _storeDisabled;
 
         private readonly Lazy<CloudBlobContainer> _containerClient;
 
@@ -38,6 +39,8 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
             _synchronizer = new SemaphoreSynchronizer<Guid>();
             _containerClient = new Lazy<CloudBlobContainer>(containerClientFactory ?? InitializeContainer);
+
+            _storeDisabled = cacheStore is NullCacheStore;
         }
 
         public async Task<ICacheResult> GetAsync(Guid key, CancellationToken cancellationToken)
@@ -54,7 +57,8 @@ namespace ImageResizer.Plugins.AzureBlobCache
             {
                 await readLock.WaitAsync(cancellationToken);
 
-                TryRelaseSemaphore(readLock);
+                if (_storeDisabled)
+                    TryRelaseSemaphore(readLock);
 
                 // Pessimistic cache fetch
                 storedResult = _cacheStore.Get(key);
@@ -68,7 +72,11 @@ namespace ImageResizer.Plugins.AzureBlobCache
                         await blob.DownloadToStreamAsync(stream, cancellationToken)
                                   .ConfigureAwait(false);
 
-                        return CreateResult(CacheQueryResult.Hit, stream);
+                        var result = CreateResult(CacheQueryResult.Hit, stream);
+
+                        _cacheStore.Insert(key, result);
+
+                        return result;
                     }                    
                 }
                 catch (StorageException ex) when (ex.Message.Contains("(404)"))
@@ -82,6 +90,9 @@ namespace ImageResizer.Plugins.AzureBlobCache
             }
             finally
             {
+                if (!_storeDisabled)
+                    TryRelaseSemaphore(readLock);
+
                 _synchronizer.TryRemove(key);
             }
         }
