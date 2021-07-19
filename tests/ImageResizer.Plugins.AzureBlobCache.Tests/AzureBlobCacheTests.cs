@@ -1,4 +1,5 @@
 ﻿using ImageResizer.Caching.Core;
+using ImageResizer.Caching.Core.Identity;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Collections.Generic;
 using System.IO;
@@ -136,8 +137,9 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         private Task<ICacheResult> GetAsync(AzureBlobCache cache, string path, CancellationToken token)
         {
             var extension = Path.GetExtension(path);
+            var generator = CreateCacheKeyGenerator();
 
-            return cache.GetAsync(path, extension, token);
+            return cache.GetAsync(generator.Generate(path, extension), token);
         }
 
         private Task<ICacheResult> CreateAsync(AzureBlobCache cache, string path)
@@ -147,13 +149,19 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
 
         private async Task<ICacheResult> CreateAsync(AzureBlobCache cache, string path, CancellationToken token)
         {
+            var generator = CreateCacheKeyGenerator();
             var extension = Path.GetExtension(path);
             var bufferSize = 4096;
 
             using (var fileStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, true))
             {
-                return await cache.CreateAsync(path, extension, token, (stream) => fileStream.CopyToAsync(stream, bufferSize));
+                return await cache.CreateAsync(generator.Generate(path, extension), token, (stream) => fileStream.CopyToAsync(stream, bufferSize));
             }
+        }
+
+        private ICacheKeyGenerator CreateCacheKeyGenerator()
+        {
+            return new MD5CacheKeyGenerator();
         }
 
         private AzureBlobCache CreateDefaultBlobCache()
