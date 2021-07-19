@@ -69,12 +69,13 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
                 try
                 {
-                    var stream = new MemoryStream();
+                    using (var stream = new MemoryStream(4096))
+                    {
+                        await blob.DownloadToStreamAsync(stream, cancellationToken)
+                                  .ConfigureAwait(false);
 
-                    await blob.DownloadToStreamAsync(stream, cancellationToken)
-                              .ConfigureAwait(false);
-
-                    return CreateResult(CacheQueryResult.Hit, stream);
+                        return CreateResult(CacheQueryResult.Hit, stream);
+                    }                    
                 }
                 catch (StorageException ex) when (ex.Message.Contains("(404)"))
                 {
@@ -110,11 +111,11 @@ namespace ImageResizer.Plugins.AzureBlobCache
                         stream.Seek(0, SeekOrigin.Begin);
 
                         await blob.UploadFromStreamAsync(stream, cancellationToken)
-                                 .ConfigureAwait(false);
+                                  .ConfigureAwait(false);
 
-                        var result = CreateResult(CacheQueryResult.Hit, stream);
+                        var result = CreateResult(CacheQueryResult.Miss, stream);
 
-                        _cacheStore.Insert(key, result);
+                        _cacheStore.Insert(key, RewriteResult(CacheQueryResult.Hit, result.Contents));
 
                         await _cacheIndex.NotifyAddedAsync(key, DateTime.UtcNow, result.Contents.Length)
                                          .ConfigureAwait(false);
@@ -153,6 +154,15 @@ namespace ImageResizer.Plugins.AzureBlobCache
         public ICacheStore GetStore()
         {
             return _cacheStore;
+        }
+
+        private ICacheResult RewriteResult(CacheQueryResult result, byte[] contents)
+        {
+            return new AzureBlobCacheQueryResult
+            {
+                Result = result,
+                Contents = contents
+            };
         }
 
         private ICacheResult CreateResult(CacheQueryResult result, MemoryStream stream = null)
