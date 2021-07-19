@@ -75,6 +75,7 @@
   <ItemGroup>
     <Compile Include="Exceptions\ImageFormatValidationException.cs" />
     <Compile Include="Models\DataPoint.cs" />
+    <Compile Include="Models\Distribution.cs" />
     <Compile Include="Models\ImageFormatDescriptor.cs" />
     <Compile Include="Models\ImageInstructionGroup.cs" />
     <Compile Include="Models\PageInstructions.cs" />

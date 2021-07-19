@@ -14,6 +14,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics.Services
         private readonly IList<PageInstructions> _pages;
         private readonly IList<DataPoint> _dataPoints;
         private readonly Func<string, Instructions, Task<CacheQueryResult>> _task;
+        private readonly Distribution _distribution;
         private readonly PerformanceCounter _cpuCounter;
         private readonly PerformanceCounter _memoryCounter;
         private readonly Timer _timer;
@@ -30,7 +31,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics.Services
         /// </summary>
         /// <param name="task"></param>
         /// <param name="taskInterval">The interval in which to check the queue</param>
-        public LoadWorker(IList<PageInstructions> pages, int threads, TimeSpan taskInterval, Func<string, Instructions, Task<CacheQueryResult>> task, bool debug = false)
+        public LoadWorker(IList<PageInstructions> pages, int threads, TimeSpan taskInterval, Func<string, Instructions, Task<CacheQueryResult>> task, Distribution distribution = Distribution.Linear, bool debug = false)
         {
             _pages = pages ?? throw new ArgumentNullException(nameof(pages));
             _task = task ?? throw new ArgumentNullException(nameof(task));
@@ -41,6 +42,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics.Services
 
             _randomizer = new Random();
             _dataPoints = new List<DataPoint>();
+            _distribution = distribution;
             _threads = threads;
             _debug = debug;
             _stopwatch = new Stopwatch();
@@ -114,7 +116,9 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics.Services
             if (!_started)
                 return;
 
-            var randomPage = _pages[_randomizer.Next(0, _pages.Count)];
+            var randomIndex = (int)(Math.Pow(_randomizer.NextDouble(), (double)_distribution) * _pages.Count);
+            var randomPage = _pages[randomIndex];
+
             var pageImages = randomPage.Flatten().ToList();
             var batches = Math.Ceiling(pageImages.Count / (double)_threads);
 

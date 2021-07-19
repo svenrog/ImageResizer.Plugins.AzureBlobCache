@@ -33,10 +33,13 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
         [Option('p', "period", Required = false, Default = "00:01:00", HelpText = "Testing period")]
         public string Period { get; set; }
 
-        [Option('b', "baseline", Required = false, Default = false, HelpText = "Testing period")]
+        [Option('t', "distribution", Required = false, Default = 10, HelpText = "Exponent of page load distribution during test (pages closer to start are loaded more often).")]
+        public int Distribution { get; set; } = 10;
+
+        [Option('b', "baseline", Required = false, Default = false, HelpText = "Baseline testing")]
         public bool Baseline { get; set; }
 
-        [Option('d', "debug", Required = false, Default = false, HelpText = "Testing period")]
+        [Option('d', "debug", Required = false, Default = false, HelpText = "Enable detailed error messages")]
         public bool Debug { get; set; }
     }
 
@@ -74,6 +77,8 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
                 Console.WriteLine($"Generating random pages from {files.Count} found images...");
                 var pages = GeneratePages(files);
 
+                Console.WriteLine($"Created {pages.Count} test pages with a set of images with different configurations.");
+
                 Report report;
                 string reportName;
 
@@ -82,14 +87,14 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
                 if (options.Baseline)
                 {
                     reportName = "Report-baseline";
-                    report = await RunBaselineAnalysis(testPeriod, requestPeriod, pages);
+                    report = await RunBaselineAnalysis(options, pages);
 
                     Console.WriteLine($"Baseline average response time is {report.Average:0.00} ms.");
                 }
                 else
                 {
                     reportName = "Report";
-                    report = await RunCacheAnalysis(testPeriod, requestPeriod, pages);
+                    report = await RunCacheAnalysis(options, pages);
 
                     Console.WriteLine($"Cached average response time is {report.Average:0.00} ms.");
                 }
@@ -98,8 +103,6 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
 
                 Console.WriteLine($"Writing report: {outputFile} to disk");
                 File.WriteAllText(Path.Combine(options.Output, outputFile), CompileReport(report));
-
-                Console.ReadKey();
             }
             catch (Exception ex)
             {
@@ -126,9 +129,9 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
             return stringBuilder.ToString();
         }
 
-        static async Task<Report> RunBaselineAnalysis(TimeSpan testPeriod, TimeSpan requestPeriod, IList<PageInstructions> pages)
+        static async Task<Report> RunBaselineAnalysis(Options options, IList<PageInstructions> pages)
         {
-            return await RunAnalysis(testPeriod, requestPeriod, pages, (path, instructions) => 
+            return await RunAnalysis(options, pages, (path, instructions) => 
             {
                 using (var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 using (var buffer = new MemoryStream(4096))
@@ -146,13 +149,13 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
             });
         }
 
-        static async Task<Report> RunCacheAnalysis(TimeSpan testPeriod, TimeSpan requestPeriod, IList<PageInstructions> pages)
+        static async Task<Report> RunCacheAnalysis(Options options, IList<PageInstructions> pages)
         {
             var provider = GetCacheProvider();
             var keyGenerator = GetKeyGenerator();
             var usedKeys = new Dictionary<Guid, string>(pages.Count);
 
-            return await RunAnalysis(testPeriod, requestPeriod, pages, async (path, instructions) =>
+            return await RunAnalysis(options, pages, async (path, instructions) =>
             {
                 var requestKey = $"{path}|{instructions}";
                 var cacheKey = keyGenerator.Generate(requestKey);
@@ -177,13 +180,22 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
             });
         }
 
-        static async Task<Report> RunAnalysis(TimeSpan testPeriod, TimeSpan requestPeriod, IList<PageInstructions> pages, Func<string, Instructions, Task<CacheQueryResult>> task)
+        static Task<Report> RunAnalysis(Options options, IList<PageInstructions> pages, Func<string, Instructions, Task<CacheQueryResult>> task)
+        {
+            var testPeriod = TimeSpan.Parse(options.Period);
+            var requestPeriod = TimeSpan.FromSeconds(1.0 / options.Requests);
+            var distribution = (Distribution)options.Distribution;
+
+            return RunAnalysis(testPeriod, requestPeriod, distribution, pages, task);
+        }
+
+        static async Task<Report> RunAnalysis(TimeSpan testPeriod, TimeSpan requestPeriod, Distribution distribution, IList<PageInstructions> pages, Func<string, Instructions, Task<CacheQueryResult>> task)
         {
             ThreadPool.GetAvailableThreads(out int workerThreads, out int completionPortThreads);
 
             var completionSource = new TaskCompletionSource<bool>();
             
-            using (var pageLoadWorker = new LoadWorker(pages, workerThreads, requestPeriod, task))
+            using (var pageLoadWorker = new LoadWorker(pages, workerThreads, requestPeriod, task, distribution))
             using (var periodTimer = GetTimer(testPeriod, () => completionSource.SetResult(true)))
             {
                 pageLoadWorker.Start();
