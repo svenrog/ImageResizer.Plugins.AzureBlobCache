@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageResizer.Caching.Core",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageResizer.Caching.Core.Tests", "tests\ImageResizer.Caching.Core.Tests\ImageResizer.Caching.Core.Tests.csproj", "{7099860B-2E17-44F7-A758-350F1BB4ED6B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics", "tests\ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics\ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics.csproj", "{720077DE-73C3-4C3E-AF5D-810C332BBEA5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,6 +37,10 @@ Global
 		{7099860B-2E17-44F7-A758-350F1BB4ED6B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7099860B-2E17-44F7-A758-350F1BB4ED6B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7099860B-2E17-44F7-A758-350F1BB4ED6B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{720077DE-73C3-4C3E-AF5D-810C332BBEA5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{720077DE-73C3-4C3E-AF5D-810C332BBEA5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{720077DE-73C3-4C3E-AF5D-810C332BBEA5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{720077DE-73C3-4C3E-AF5D-810C332BBEA5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -42,6 +48,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{5C636A30-C855-4923-AEDF-8B5E973CF578} = {C86BBBED-D441-477A-8367-BBEF01E39A90}
 		{7099860B-2E17-44F7-A758-350F1BB4ED6B} = {C86BBBED-D441-477A-8367-BBEF01E39A90}
+		{720077DE-73C3-4C3E-AF5D-810C332BBEA5} = {C86BBBED-D441-477A-8367-BBEF01E39A90}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E31D61A5-0DB9-4A7D-9D6B-3A5F055544F9}
