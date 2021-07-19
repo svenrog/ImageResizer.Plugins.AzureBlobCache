@@ -36,12 +36,11 @@ namespace ImageResizer.Plugins.AzureBlobCache
         {
             using (var tokenSource = GetTokenSource())
             {
-                var cacheResult = await _cacheProvider.GetAsync(plan.RequestCachingKey, plan.EstimatedFileExtension, tokenSource.Token);
+                var path = plan.RequestCachingKey;
+                var extension = plan.EstimatedFileExtension;
+                var cacheResult = await _cacheProvider.GetAsync(path, extension, tokenSource.Token);
                 if (cacheResult.Result == CacheQueryResult.Miss)
                 {
-                    var path = plan.RequestCachingKey;
-                    var extension = plan.EstimatedFileExtension;
-
                     cacheResult = await _cacheProvider.CreateAsync(path, extension, tokenSource.Token, (stream) => plan.CreateAndWriteResultAsync(stream, plan));
                 }
 

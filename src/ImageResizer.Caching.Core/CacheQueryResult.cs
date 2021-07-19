@@ -16,6 +16,10 @@ namespace ImageResizer.Caching.Core
         /// <summary>
         /// The item was already in the cache.
         /// </summary>
-        Hit = 2
+        Hit = 2,
+        /// <summary>
+        /// The item fetch caused a fatal error.
+        /// </summary>
+        Fatal = 4
     }
 }
