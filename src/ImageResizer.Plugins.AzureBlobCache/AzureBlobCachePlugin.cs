@@ -1,5 +1,6 @@
 ﻿using ImageResizer.Caching;
 using ImageResizer.Caching.Core;
+using ImageResizer.Caching.Core.Identity;
 using ImageResizer.Caching.Core.Indexing;
 using ImageResizer.Caching.Core.Operation;
 using ImageResizer.Configuration;
@@ -31,17 +32,18 @@ namespace ImageResizer.Plugins.AzureBlobCache
         protected int ClientCacheMinutes;
 
         private IAsyncCacheProvider _cacheProvider;
+        private ICacheKeyGenerator _keyGenerator;
 
         public virtual async Task ProcessAsync(HttpContext context, IAsyncResponsePlan plan)
         {
             using (var tokenSource = GetTokenSource())
             {
-                var path = plan.RequestCachingKey;
-                var extension = plan.EstimatedFileExtension;
-                var cacheResult = await _cacheProvider.GetAsync(path, extension, tokenSource.Token);
+                var key = _keyGenerator.Generate(plan.RequestCachingKey, plan.EstimatedFileExtension);
+                var cacheResult = await _cacheProvider.GetAsync(key, tokenSource.Token);
+
                 if (cacheResult.Result == CacheQueryResult.Miss)
                 {
-                    cacheResult = await _cacheProvider.CreateAsync(path, extension, tokenSource.Token, (stream) => plan.CreateAndWriteResultAsync(stream, plan));
+                    cacheResult = await _cacheProvider.CreateAsync(key, tokenSource.Token, (stream) => plan.CreateAndWriteResultAsync(stream, plan));
                 }
 
                 // Note: Since the async pipleine doesn't have support for client caching, we're patching it here.
@@ -127,6 +129,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
         protected virtual void Start()
         {
             _cacheProvider = new AzureBlobCache(GetConnection(ConnectionName), ContainerName, GetCacheIndex(), GetCacheStore());
+            _keyGenerator = GetKeyGenerator();
 
             var index = GetConfiguredIndex();
             if (index is IStartable startable)
@@ -177,6 +180,11 @@ namespace ImageResizer.Plugins.AzureBlobCache
             else
                 context.Response.CacheControl = HttpCacheability.Public.ToString();
 
+        }
+
+        private ICacheKeyGenerator GetKeyGenerator()
+        {
+            return new MD5CacheKeyGenerator();
         }
 
         private string GetConnection(string name)

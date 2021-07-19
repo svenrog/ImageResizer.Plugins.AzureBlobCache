@@ -63,11 +63,11 @@ namespace ImageResizer.Caching.Core.Threading
             if (key == null)
                 return false;
 
-            if (!Index.ContainsKey(key))
-                return false;
-
             lock (KeyLock)
             {
+                if (!Index.ContainsKey(key))
+                    return false;
+
                 var value = Index[key];
 
                 if (value.CurrentCount < SemaphoreMaxCount)

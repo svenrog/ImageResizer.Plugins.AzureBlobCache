@@ -1,5 +1,4 @@
 ﻿using ImageResizer.Caching.Core;
-using ImageResizer.Caching.Core.Identity;
 using ImageResizer.Caching.Core.Indexing;
 using ImageResizer.Caching.Core.Threading;
 using Microsoft.WindowsAzure.Storage;
@@ -17,38 +16,32 @@ namespace ImageResizer.Plugins.AzureBlobCache
         private readonly string _containerName;
 
         private readonly IThreadSynchronizer<Guid, SemaphoreSlim> _synchronizer;
-        private readonly ICacheKeyGenerator _keyGenerator;
         private readonly ICacheIndex _cacheIndex;
         private readonly ICacheStore _cacheStore;
 
         private readonly Lazy<CloudBlobContainer> _containerClient;
 
-        public AzureBlobCache(string connectionString, string containerName) : this(connectionString, containerName, new NullCacheIndex(), new NullCacheStore(), new MD5CacheKeyGenerator()) { }
-        public AzureBlobCache(string connectionString, string containerName, ICacheStore cacheStore) : this(connectionString, containerName, new NullCacheIndex(), cacheStore, new MD5CacheKeyGenerator()) { }
-        public AzureBlobCache(string connectionString, string containerName, ICacheIndex cacheIndex, ICacheStore cacheStore) : this(connectionString, containerName, cacheIndex, cacheStore, new MD5CacheKeyGenerator()) { }
-        public AzureBlobCache(string connectionString, string containerName, ICacheIndex cacheIndex, ICacheStore cacheStore, ICacheKeyGenerator keyGenerator) : this(cacheIndex, cacheStore, keyGenerator)
+        public AzureBlobCache(string connectionString, string containerName) : this(connectionString, containerName, new NullCacheIndex(), new NullCacheStore()) { }
+        public AzureBlobCache(string connectionString, string containerName, ICacheStore cacheStore) : this(connectionString, containerName, new NullCacheIndex(), cacheStore) { }
+        public AzureBlobCache(string connectionString, string containerName, ICacheIndex cacheIndex, ICacheStore cacheStore) : this(cacheIndex, cacheStore)
         {
             _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
             _containerName = containerName ?? throw new ArgumentNullException(nameof(containerName));
         }
 
-        public AzureBlobCache(Func<CloudBlobContainer> containerClientFactory) : this(new NullCacheIndex(), new NullCacheStore(), new MD5CacheKeyGenerator(), containerClientFactory) { }
-        public AzureBlobCache(ICacheIndex cacheIndex, Func<CloudBlobContainer> containerClientFactory) : this(cacheIndex, new NullCacheStore(), new MD5CacheKeyGenerator(), containerClientFactory) { }
-        public AzureBlobCache(ICacheIndex cacheIndex, ICacheStore cacheStore, Func<CloudBlobContainer> containerClientFactory) : this(cacheIndex, cacheStore, new MD5CacheKeyGenerator(), containerClientFactory) { }
-        protected AzureBlobCache(ICacheIndex cacheIndex, ICacheStore cacheStore, ICacheKeyGenerator keyGenerator, Func<CloudBlobContainer> containerClientFactory = null)
+        public AzureBlobCache(Func<CloudBlobContainer> containerClientFactory) : this(new NullCacheIndex(), new NullCacheStore(), containerClientFactory) { }
+        public AzureBlobCache(ICacheIndex cacheIndex, Func<CloudBlobContainer> containerClientFactory) : this(cacheIndex, new NullCacheStore(), containerClientFactory) { }
+        protected AzureBlobCache(ICacheIndex cacheIndex, ICacheStore cacheStore, Func<CloudBlobContainer> containerClientFactory = null)
         {            
             _cacheIndex = cacheIndex ?? throw new ArgumentNullException(nameof(cacheIndex));
             _cacheStore = cacheStore ?? throw new ArgumentNullException(nameof(cacheStore));
-            _keyGenerator = keyGenerator ?? throw new ArgumentNullException(nameof(keyGenerator));
 
             _synchronizer = new SemaphoreSynchronizer<Guid>();
             _containerClient = new Lazy<CloudBlobContainer>(containerClientFactory ?? InitializeContainer);
         }
 
-        public async Task<ICacheResult> GetAsync(string path, string extension, CancellationToken cancellationToken)
+        public async Task<ICacheResult> GetAsync(Guid key, CancellationToken cancellationToken)
         {
-            var key = GetKey(path, extension);
-
             // Optimistic cache fetch
             var storedResult = _cacheStore.Get(key);
             if (storedResult != null)
@@ -60,7 +53,8 @@ namespace ImageResizer.Plugins.AzureBlobCache
             try
             {
                 await readLock.WaitAsync(cancellationToken);
-                readLock.Release();
+
+                TryRelaseSemaphore(readLock);
 
                 // Pessimistic cache fetch
                 storedResult = _cacheStore.Get(key);
@@ -81,20 +75,19 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 {
                     return CreateResult(CacheQueryResult.Miss);
                 }
-                finally
-                {
-                    _synchronizer.TryRemove(key);
-                }
             }
             catch (OperationCanceledException)
             {
                 return CreateResult(CacheQueryResult.Failed);
             }
+            finally
+            {
+                _synchronizer.TryRemove(key);
+            }
         }
 
-        public async Task<ICacheResult> CreateAsync(string path, string extension, CancellationToken cancellationToken, Func<Stream, Task> asyncWriter)
+        public async Task<ICacheResult> CreateAsync(Guid key, CancellationToken cancellationToken, Func<Stream, Task> asyncWriter)
         {
-            var key = GetKey(path, extension);
             var blob = GetBlob(key);
             var writeLock = _synchronizer[key];
 
@@ -141,10 +134,32 @@ namespace ImageResizer.Plugins.AzureBlobCache
             }
             finally
             {
-                if (writeLock.CurrentCount < 1)
-                    writeLock.Release();
-
+                TryRelaseSemaphore(writeLock);
                 _synchronizer.TryRemove(key);
+            }
+        }
+
+        private bool TryRelaseSemaphore(SemaphoreSlim semaphore)
+        {
+            if (semaphore.CurrentCount > 1)
+                return false;
+
+            try
+            {
+                semaphore.Release();
+                return true;
+            }
+            catch (SemaphoreFullException)
+            {
+                // Under really heavy load multiple threads will be in here in the same context.
+                // One might be just one step ahead of the other, trying to release the semaphore.
+                return false;
+            }
+            catch (ObjectDisposedException)
+            {
+                // Under really heavy load multiple threads will be trying to remove unused semaphores.
+                // This may lead to a thread lagging a bit behind trying to release an already disposed semaphore.
+                return false;
             }
         }
 
@@ -176,11 +191,6 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 Result = result,
                 Contents = stream?.ToArray()
             };
-        }
-
-        private Guid GetKey(string path, string extension)
-        {
-            return _keyGenerator.Generate(path, extension);
         }
 
         private CloudBlockBlob GetBlob(Guid key)
