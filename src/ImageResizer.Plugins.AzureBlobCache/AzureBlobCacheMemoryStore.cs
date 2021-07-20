@@ -36,11 +36,11 @@ namespace ImageResizer.Plugins.AzureBlobCache
             var cacheKey = GetCacheKey(key);
             var cacheItem = new CacheItem(cacheKey, value);
             
-            var absoluteExpiration = _absoluteExpiry.HasValue ? new DateTimeOffset(DateTime.UtcNow.Add(_absoluteExpiry.Value)) : default;
-            var slidingExpiration = _slidingExpiry ?? default;
+            var absoluteExpiration = _absoluteExpiry.HasValue ? new DateTimeOffset(DateTime.UtcNow.Add(_absoluteExpiry.Value)) : DateTimeOffset.MaxValue;
+            var slidingExpiration = _slidingExpiry ?? TimeSpan.Zero;
 
             if (_absoluteExpiry.HasValue && _slidingExpiry.HasValue)
-                slidingExpiration = default;
+                slidingExpiration = TimeSpan.Zero;
 
             var policy = new CacheItemPolicy
             {
