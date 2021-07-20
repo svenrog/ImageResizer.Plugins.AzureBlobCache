@@ -1,6 +1,7 @@
 ﻿using ImageResizer.Caching.Core;
 using ImageResizer.Caching.Core.Identity;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -18,7 +19,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
             
             var result = await CreateAsync(blobCache, "Test/test1.jpg");
 
-            Assert.AreEqual(CacheQueryResult.Hit, result.Result);
+            Assert.AreEqual(CacheQueryResult.Miss, result.Result);
             Assert.IsNotNull(result.Contents);
             Assert.IsTrue(result.Contents.Length > 0);
         }
@@ -80,7 +81,6 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
             Assert.IsTrue(result.Contents.Length > 0);
         }
 
-
         [TestMethod]
         public async Task CanGetParallel()
         {
@@ -123,7 +123,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
 
             foreach (var result in results)
             {
-                Assert.AreEqual(CacheQueryResult.Hit, result.Result);
+                Assert.AreEqual(CacheQueryResult.Miss, result.Result);
                 Assert.IsNotNull(result.Contents);
                 Assert.IsTrue(result.Contents.Length > 0);
             }
@@ -189,7 +189,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
             if (string.IsNullOrEmpty(Config.BlobConnectionString))
                 Assert.Inconclusive("Test requires a connection named 'ResizerAzureBlobs' with a connection string to an Azure storage account.");
 
-            var store = new AzureBlobCacheMemoryStore(200);
+            var store = new AzureBlobCacheMemoryStore(200, TimeSpan.FromMinutes(1));
             return new AzureBlobCache(Config.BlobConnectionString, Constants.CacheTestContainerName, store);
         }
     }

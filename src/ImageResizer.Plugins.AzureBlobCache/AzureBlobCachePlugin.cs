@@ -8,6 +8,7 @@ using ImageResizer.Plugins.AzureBlobCache.Handlers;
 using ImageResizer.Plugins.Basic;
 using System;
 using System.Configuration;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
@@ -24,6 +25,8 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
         protected int MemoryStoreLimitMb;
         protected string MemoryStorePollingInterval = "00:04:01";
+        protected string MemoryStoreSlidingExpiration = "00:30:00";
+        protected string MemoryStoreAbsoluteExpiration = null;
 
         protected int IndexMaxSizeMb;
         protected int IndexMaxItems;
@@ -103,6 +106,8 @@ namespace ImageResizer.Plugins.AzureBlobCache
             IndexPollingInterval = config.get("azureBlobCache.indexPollingInterval", IndexPollingInterval);
             MemoryStoreLimitMb = config.get("azureBlobCache.memoryStoreLimitMb", MemoryStoreLimitMb);
             MemoryStorePollingInterval = config.get("azureBlobCache.memoryStorePollingInterval", MemoryStorePollingInterval);
+            MemoryStoreSlidingExpiration = config.get("azureBlobCache.memoryStoreSlidingExpiration", MemoryStoreSlidingExpiration);
+            MemoryStoreAbsoluteExpiration = config.get("azureBlobCache.memoryStoreAbsoluteExpiration", MemoryStoreAbsoluteExpiration);
             ClientCacheMinutes = config.get("clientcache.minutes", ClientCacheMinutes);
         }
 
@@ -153,11 +158,16 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
         protected virtual CancellationTokenSource GetTokenSource()
         {
-            #if DEBUG 
+            if (Debugger.IsAttached)
+            {
+                // Cache queries will timeout while stepping through source code
+                // This keeps the requests active while debugging
                 return new CancellationTokenSource();
-            #endif
-
-            return new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
+            }
+            else
+            {
+                return new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
+            }
         }
 
         protected virtual void RemapContentResponse(HttpContext context, IAsyncResponsePlan plan, byte[] contents)
@@ -205,10 +215,24 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
         private ICacheStore GetCacheStore()
         {
-            if (MemoryStoreLimitMb > 0)
-                return new AzureBlobCacheMemoryStore(MemoryStoreLimitMb, MemoryStorePollingInterval, null);
-            
-            return new NullCacheStore();
+            if (MemoryStoreLimitMb < 1)
+                return new NullCacheStore();
+
+            var absoluteExpiration = GetTimeSpan(MemoryStoreAbsoluteExpiration);
+            var slidingExpiration = GetTimeSpan(MemoryStoreSlidingExpiration);
+            var pollingInterval = GetTimeSpan(MemoryStorePollingInterval);
+
+            return new AzureBlobCacheMemoryStore(MemoryStoreLimitMb, absoluteExpiration, slidingExpiration, pollingInterval);
+        }
+
+        private TimeSpan? GetTimeSpan(string value)
+        {
+            var result = (TimeSpan?)null;
+
+            if (TimeSpan.TryParse(value, out var parsedValue))
+                result = parsedValue;
+
+            return result;
         }
     }
 }

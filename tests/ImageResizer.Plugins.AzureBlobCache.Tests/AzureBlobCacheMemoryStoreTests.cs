@@ -37,9 +37,9 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
             };
         }
 
-        private TestableAzureBlobCacheMemoryStore CreateStore(int sizeLimitMb = 1, string pollingInterval = "00:05:00")
+        private TestableAzureBlobCacheMemoryStore CreateStore(int sizeLimitMb = 1, TimeSpan? pollingInterval = null)
         {
-            return new TestableAzureBlobCacheMemoryStore(sizeLimitMb, pollingInterval, null);
+            return new TestableAzureBlobCacheMemoryStore(sizeLimitMb, TimeSpan.FromMinutes(1), pollingInterval);
         }
     }
 }

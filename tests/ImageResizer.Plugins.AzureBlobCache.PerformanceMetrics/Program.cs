@@ -338,7 +338,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
 
         static ICacheStore GetCacheStore()
         {
-            return new AzureBlobCacheMemoryStore(1000, "00:05:00");
+            return new AzureBlobCacheMemoryStore(1000, null, TimeSpan.FromMinutes(1), null, TimeSpan.FromMinutes(4));
         }
     }
 }

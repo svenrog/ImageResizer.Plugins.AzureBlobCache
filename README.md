@@ -39,19 +39,21 @@ For detailed settings an `<azureBlobCache>` element can be provided inside `<res
 </configuration>
 ```
 
-This element has a list of attributes that can be provided for detailed control plugin behaviour.
+This element has a list of attributes that can be provided for detailed control over plugin behaviour.
 
 | Parameter | Description | Default value |
 | --------- | ----------- | ------------- |
-| connectionName | Name of connection to Azure blob storage in `connectionStrings.config` | `"ResizerAzureBlobs"`
-| containerName | Name of the container where cache blobs are to be stored | `"imagecache"` |
-| timeoutSeconds | Seconds before attempt to fetch cache item is aborted | 5 |
-| memoryStoreLimitMb | If provided, a memory cache is created in which recent cache items are kept (increased performance) |
-| memoryStorePollingInterval | If a memory cache exists, the memory cache will be cleaned in the given interval | `"00:04:01"` |
-| indexMaxSizeMb | If provided, the size of the index will be monitored and cleaned as not to exceed given size |
-| indexMaxItems | If provided, the items in index will be monitored and cleaned as not to exceed given count |
-| indexPollingInterval | The interval in which the index max size should be checked | `"00:05:00"`
-| _(index database connection name)_ | (Not configurable) Index monitoring uses SQL, if index is set up, this is the name of the connection string to the created EF context | `"ResizerEFConnection"`
+| connectionName | Name of connection to Azure blob storage in `connectionStrings.config`. | `"ResizerAzureBlobs"`
+| containerName | Name of the container where cache blobs are to be stored. | `"imagecache"` |
+| timeoutSeconds | Seconds before attempt to fetch cache item is aborted (after which the underlying image is returned normally). | 5 |
+| memoryStoreLimitMb | If provided, a memory cache is created, where recent cache items are kept (for increased performance). |
+| memoryStoreSlidingExpiration | The [sliding expiration](https://peterdaugaardrasmussen.com/2017/10/02/c-emorycache-absolute-expiration-vs-sliding-expiration/#slidingexpiration) time of a cache item in [`System.TimeSpan` format](https://docs.microsoft.com/en-us/dotnet/standard/base-types/custom-timespan-format-strings) (`"HH:MM:SS"`). | `"00:30:00"` |
+| memoryStoreAbsoluteExpiration | The [absolute expiration](https://peterdaugaardrasmussen.com/2017/10/02/c-emorycache-absolute-expiration-vs-sliding-expiration/#absoluteexpiration) time of a cache item (overrides sliding expiration if provided `"HH:MM:SS"`). |
+| memoryStorePollingInterval | If a memory cache exists, the memory cache will be updated in the given interval (`"HH:MM:SS"`). Additional details about memory cache configuration can be found [here](https://docs.microsoft.com/en-us/dotnet/framework/configure-apps/file-schema/runtime/namedcaches-element-cache-settings). | `"00:04:01"` |
+| indexMaxSizeMb | If provided, the size of the index will be monitored and cleaned as not to exceed given size (in MB). |
+| indexMaxItems | If provided, the items in index will be monitored and cleaned as not to exceed given count (of items). |
+| indexPollingInterval | The interval in which the index max size should be checked (`"HH:MM:SS"`). | `"00:05:00"`
+| _indexDatabaseConnectionName_ | _Not configurable._ The index monitoring uses SQL, if index is set up, this is the name of the connection string to the created EntityFramework context. | `"ResizerEFConnection"`
 
 ## Important requirements
 
@@ -76,7 +78,7 @@ For this plugin to work with Optimizely (formerly EPiServer), at least version `
 ### Advanced topics
 
 - [Index maintenance](/docs/indexmaintenance.md)
-- [Client caching missing from async pipeline](/docs/clientcaching.md)
+- [Client caching normally missing from async pipeline](/docs/clientcaching.md)
 
 ## Package maintainer
 

@@ -8,12 +8,18 @@ namespace ImageResizer.Plugins.AzureBlobCache
     public class AzureBlobCacheMemoryStore : ICacheStore
     {
         private const string _name = nameof(AzureBlobCacheMemoryStore);
+        private readonly TimeSpan? _absoluteExpiry;
+        private readonly TimeSpan? _slidingExpiry;
+        
         protected readonly MemoryCache Store;
 
-        public AzureBlobCacheMemoryStore(int? cacheMemoryLimitMb, string pollingInterval = "00:04:01", int? physicalMemoryLimitPercentage = null)
+        public AzureBlobCacheMemoryStore(int? cacheMemoryLimitMb, TimeSpan? absoluteExpiry = null, TimeSpan? slidingExpiry = null, TimeSpan? pollingInterval = null) : this(cacheMemoryLimitMb, null, absoluteExpiry, slidingExpiry, pollingInterval) { }
+        public AzureBlobCacheMemoryStore(int? cacheMemoryLimitMb, int? physicalMemoryLimitPercentage = null, TimeSpan? absoluteExpiry = null, TimeSpan? slidingExpiry = null, TimeSpan? pollingInterval = null)
         {
-            var config = GetConfig(cacheMemoryLimitMb, physicalMemoryLimitPercentage, pollingInterval);
+            _absoluteExpiry = absoluteExpiry;
+            _slidingExpiry = slidingExpiry;
 
+            var config = GetConfig(cacheMemoryLimitMb, physicalMemoryLimitPercentage, pollingInterval ?? TimeSpan.FromMinutes(4));
             Store = new MemoryCache(_name, config);
         }
 
@@ -29,11 +35,18 @@ namespace ImageResizer.Plugins.AzureBlobCache
         {
             var cacheKey = GetCacheKey(key);
             var cacheItem = new CacheItem(cacheKey, value);
-            var expiration = new DateTimeOffset(DateTime.UtcNow.AddHours(1));
+            
+            var absoluteExpiration = _absoluteExpiry.HasValue ? new DateTimeOffset(DateTime.UtcNow.Add(_absoluteExpiry.Value)) : default;
+            var slidingExpiration = _slidingExpiry ?? default;
+
+            if (_absoluteExpiry.HasValue && _slidingExpiry.HasValue)
+                slidingExpiration = default;
+
             var policy = new CacheItemPolicy
             {
                 Priority = CacheItemPriority.Default,
-                AbsoluteExpiration = expiration
+                AbsoluteExpiration = absoluteExpiration,
+                SlidingExpiration = slidingExpiration
             };
 
             Store.Add(cacheItem, policy);
@@ -44,7 +57,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
             return $"{key:D}";
         }
 
-        private NameValueCollection GetConfig(int? cacheMemoryLimitMb, int? physicalMemoryLimitPercentage, string pollingInterval)
+        private NameValueCollection GetConfig(int? cacheMemoryLimitMb, int? physicalMemoryLimitPercentage, TimeSpan pollingInterval)
         {
             var config = new NameValueCollection(3);
 
@@ -54,8 +67,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
             if (physicalMemoryLimitPercentage.HasValue)
                 config.Add("PhysicalMemoryLimitPercentage", physicalMemoryLimitPercentage.Value.ToString());
 
-            if (!string.IsNullOrEmpty(pollingInterval))
-                config.Add("PollingInterval", pollingInterval);
+            config.Add("PollingInterval", pollingInterval.ToString("hh':'mm':'ss"));
 
             return config;
         }
