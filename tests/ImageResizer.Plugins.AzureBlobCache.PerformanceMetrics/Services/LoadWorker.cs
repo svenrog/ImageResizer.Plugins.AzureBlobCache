@@ -138,11 +138,11 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics.Services
             }
             catch (Exception ex)
             {
-                taskResult = CacheQueryResult.Fatal;
+                taskResult = CacheQueryResult.Error;
 
                 if (_debug)
                 {
-                    Console.WriteLine($"Fatal exception in task: {ex.Message}");
+                    Console.WriteLine($"Exception in task: {ex.Message}");
                     Console.WriteLine($"{ex.StackTrace}");
                 }                    
             }

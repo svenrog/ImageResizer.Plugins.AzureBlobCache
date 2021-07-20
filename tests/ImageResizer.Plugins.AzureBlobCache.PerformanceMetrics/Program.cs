@@ -10,6 +10,7 @@ using ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics.TestPages;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -27,8 +28,11 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
         [Option('o', "output", Required = true, HelpText = "Path to output to.")]
         public string Output { get; set; }
 
-        [Option('r', "requests", Required = false, Default = 10, HelpText = "Amount of requests to simulate (per second).")]
+        [Option('r', "requests", Required = false, Default = 20, HelpText = "Amount of requests to simulate (per second).")]
         public int Requests { get; set; }
+
+        [Option('m', "request-max-seconds", Required = false, Default = 5, HelpText = "Seconds a cache request can take before being aborted.")]
+        public int RequestMaxTime { get; set; }
 
         [Option('p', "period", Required = false, Default = "00:01:00", HelpText = "Testing period")]
         public string Period { get; set; }
@@ -111,24 +115,6 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
             }
         }
 
-        static string CompileReport(Report report)
-        {
-            var stringBuilder = new StringBuilder();
-            var headings = new [] { "#", "Result", "Time", "Elapsed", "Processor", "Memory" };
-
-            stringBuilder.AppendLine(string.Join("\t", headings));
-
-            for (var i = 0; i < report.DataPoints.Count; i++)
-            {
-                var point = report.DataPoints[i];
-                var line = new [] { $"{i + 1}", point.Result.ToString(), point.StartedMilliseconds.ToString(), point.ElapsedMilliseconds.ToString(), point.Processor.ToString(), point.Memory.ToString() };
-
-                stringBuilder.AppendLine(string.Join("\t", line));
-            }
-
-            return stringBuilder.ToString();
-        }
-
         static async Task<Report> RunBaselineAnalysis(Options options, IList<PageInstructions> pages)
         {
             return await RunAnalysis(options, pages, (path, instructions) => 
@@ -159,8 +145,8 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
             {
                 var requestKey = $"{path}|{instructions}";
                 var cacheKey = keyGenerator.Generate(requestKey);
-                var tokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(7));
-                
+                var tokenSource = GetTokenSource(options);
+
                 var cacheResult = await provider.GetAsync(cacheKey, tokenSource.Token);
                 if (cacheResult.Result == CacheQueryResult.Miss)
                 {
@@ -180,20 +166,14 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
             });
         }
 
-        static Task<Report> RunAnalysis(Options options, IList<PageInstructions> pages, Func<string, Instructions, Task<CacheQueryResult>> task)
+        static async Task<Report> RunAnalysis(Options options, IList<PageInstructions> pages, Func<string, Instructions, Task<CacheQueryResult>> task)
         {
             var testPeriod = TimeSpan.Parse(options.Period);
             var requestPeriod = TimeSpan.FromSeconds(1.0 / options.Requests);
             var distribution = (Distribution)options.Distribution;
-
-            return RunAnalysis(testPeriod, requestPeriod, distribution, pages, task);
-        }
-
-        static async Task<Report> RunAnalysis(TimeSpan testPeriod, TimeSpan requestPeriod, Distribution distribution, IList<PageInstructions> pages, Func<string, Instructions, Task<CacheQueryResult>> task)
-        {
-            ThreadPool.GetAvailableThreads(out int workerThreads, out int completionPortThreads);
-
             var completionSource = new TaskCompletionSource<bool>();
+
+            ThreadPool.GetAvailableThreads(out int workerThreads, out int completionPortThreads);
             
             using (var pageLoadWorker = new LoadWorker(pages, workerThreads, requestPeriod, task, distribution))
             using (var periodTimer = GetTimer(testPeriod, () => completionSource.SetResult(true)))
@@ -204,6 +184,24 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
                 pageLoadWorker.Stop();
                 return pageLoadWorker.GetReport();
             }
+        }
+
+        static string CompileReport(Report report)
+        {
+            var stringBuilder = new StringBuilder();
+            var headings = new[] { "#", "Result", "Time", "Elapsed", "Processor", "Memory" };
+
+            stringBuilder.AppendLine(string.Join("\t", headings));
+
+            for (var i = 0; i < report.DataPoints.Count; i++)
+            {
+                var point = report.DataPoints[i];
+                var line = new[] { $"{i + 1}", point.Result.ToString(), point.StartedMilliseconds.ToString(), point.ElapsedMilliseconds.ToString(), point.Processor.ToString(), point.Memory.ToString() };
+
+                stringBuilder.AppendLine(string.Join("\t", line));
+            }
+
+            return stringBuilder.ToString();
         }
 
         static SystemTimer GetTimer(TimeSpan timeSpan, Action action)
@@ -339,6 +337,19 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics
         static ICacheStore GetCacheStore()
         {
             return new AzureBlobCacheMemoryStore(1000, null, TimeSpan.FromMinutes(1), null, TimeSpan.FromMinutes(4));
+        }
+
+        static CancellationTokenSource GetTokenSource(Options options)
+        {
+            if (Debugger.IsAttached)
+            {
+                return new CancellationTokenSource();
+            }
+            else
+            {
+                var delay = TimeSpan.FromSeconds(options.RequestMaxTime);
+                return new CancellationTokenSource(delay);
+            }
         }
     }
 }
