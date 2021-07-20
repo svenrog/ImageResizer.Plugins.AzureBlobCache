@@ -1,4 +1,5 @@
 ﻿using ImageResizer.Caching.Core;
+using ImageResizer.Caching.Core.Extensions;
 using ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics.Models;
 using System;
 using System.Collections.Generic;
@@ -119,22 +120,9 @@ namespace ImageResizer.Plugins.AzureBlobCache.PerformanceMetrics.Services
             var randomIndex = (int)(Math.Pow(_randomizer.NextDouble(), (double)_distribution) * _pages.Count);
             var randomPage = _pages[randomIndex];
 
-            var pageImages = randomPage.Flatten().ToList();
-            var batches = Math.Ceiling(pageImages.Count / (double)_threads);
+            var pageImages = randomPage.Flatten();
 
-            for (var i = 0; i < batches; i++)
-            {
-                var batch = pageImages.Skip(i * _threads).Take(_threads).ToList();
-                var tasks = new Task[batch.Count];
-
-                for (var j = 0; j < batch.Count; j++)
-                {
-                    var tuple = batch[j];
-                    tasks[j] = ResizeAndAnalyze(tuple.Item1, tuple.Item2);
-                }
-
-                await Task.WhenAll(tasks);
-            }
+            await pageImages.ForEachAsync(_threads, (tuple) => ResizeAndAnalyze(tuple.Item1, tuple.Item2));
         }
 
         private async Task ResizeAndAnalyze(string path, Instructions instructions)
