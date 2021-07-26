@@ -14,7 +14,7 @@ There are parameters for providing a cancellation token and a required callback 
 
 ## Optimizely 
 
-Optimizely (formerly EPiServer) has a way to trigger Scheduled tasks that are stoppable. The index rebuild method is developed with this type of functionality in mind. Here is what a scheduled job would look like.
+Optimizely (formerly EPiServer) has a way to trigger Scheduled tasks that are stoppable. The index rebuild method is developed with this type of functionality in mind. Here is what a stoppable scheduled job would look like.
 
 ```
 [ScheduledPlugIn(DisplayName = "Rebuild ImageResizer blob cache index")]
@@ -30,31 +30,38 @@ public class RebuildIndexJob : ScheduledJobBase
 
     public override string Execute()
     {
+        var config = Config.Current;
+        var cachePlugin = config.Plugins.Get<AzureBlobCachePlugin>();
+        var rebuildableIndex = cachePlugin.GetConfiguredIndex() as IRebuildableCacheIndex;
+
+        if (rebuildableIndex == null)
+            return "No rebuildable index configured, nothing to rebuild";
+
         _progress = null;
         _tokenSource = new CancellationTokenSource();
 
-        var config = Config.Current;
-        var cachePlugin = config.Plugins.Get<AzureBlobCachePlugin>();
-        var index = cachePlugin.GetConfiguredIndex() as IRebuildableCacheIndex;
-
-        if (index == null)
-            return "No rebuildable index configured, nothing to rebuild";
-
         try
         {
-            AsyncHelper.RunSync(() => index.RebuildAsync(_tokenSource.Token, (p) => UpdateProgress(p)));
+            // More about AsyncHelper here: https://cpratt.co/async-tips-tricks/
+            AsyncHelper.RunSync(() => rebuildableIndex.RebuildAsync(_tokenSource.Token, (p) => UpdateProgress(p)));
 
             return $"{FormatProgress(_progress)}";
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException)
         {
             return $"Job was stopped, {FormatProgress(_progress)}";
+        }
+        finally
+        {
+            _tokenSource.Dispose();
+            _tokenSource = null;
         }
     }
 
     public override void Stop()
     {
-        _tokenSource.Cancel();
+        if (_tokenSource != null)
+            _tokenSource.Cancel();
     }
 
     private void UpdateProgress(IRebuildProgress progress)

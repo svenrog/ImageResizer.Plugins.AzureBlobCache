@@ -13,7 +13,6 @@
         <dependencies>
             <group targetFramework=".NETFramework4.6.1">
                 <dependency id="ImageResizer" version="4.0.1"  />
-                <dependency id="System.Threading.Tasks.Extensions" version="4.5.2" />
                 <dependency id="EntityFramework" version="6.1.0" />
                 <dependency id="WindowsAzure.Storage" version="8.5.0" />
             </group>
