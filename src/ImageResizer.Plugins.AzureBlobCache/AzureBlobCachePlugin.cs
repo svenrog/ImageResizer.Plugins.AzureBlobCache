@@ -93,8 +93,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
         }
 
         /// <summary>
-        /// Uses the defaults from the resizing.diskcache section in the specified configuration.
-        /// Throws an invalid operation exception if the DiskCache is already started.
+        /// Uses the defaults from the resizing.azureBlobCache section in the specified configuration.
         /// </summary>
         public virtual void LoadSettings(Config config)
         {
