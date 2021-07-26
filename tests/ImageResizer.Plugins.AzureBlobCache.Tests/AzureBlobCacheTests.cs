@@ -17,7 +17,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         {
             var blobCache = CreateDefaultBlobCache();
             
-            var result = await CreateAsync(blobCache, "Test/test1.jpg");
+            var result = await CreateAsync(blobCache, "resources/test1.jpg");
 
             Assert.AreEqual(CacheQueryResult.Miss, result.Result);
             Assert.IsNotNull(result.Contents);
@@ -28,7 +28,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         public async Task CanGet()
         {
             var blobCache = CreateDefaultBlobCache();
-            var path = "Test/test1.jpg";
+            var path = "resources/test1.jpg";
 
             await CreateAsync(blobCache, path);
 
@@ -43,7 +43,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         public async Task CanMiss()
         {
             var blobCache = CreateDefaultBlobCache();
-            var path = "Test/neverbeforerequested.jpg";
+            var path = "resources/neverbeforerequested.jpg";
 
             var result = await GetAsync(blobCache, path);
 
@@ -55,7 +55,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         public async Task CanGetWithIndexConfigured()
         {
             var blobCache = CreateIndexedBlobCache();
-            var path = "Test/test4.jpg";
+            var path = "resources/test4.jpg";
 
             await CreateAsync(blobCache, path);
 
@@ -70,7 +70,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         public async Task CanGetWithStoreConfigured()
         {
             var blobCache = CreateMemoryStoreBlobCache();
-            var path = "Test/test5.jpg";
+            var path = "resources/test5.jpg";
 
             await CreateAsync(blobCache, path);
 
@@ -85,7 +85,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         public async Task CanGetParallel()
         {
             var blobCache = CreateDefaultBlobCache();
-            var path = "Test/test1.jpg";
+            var path = "resources/test1.jpg";
 
             await CreateAsync(blobCache, path);
 
@@ -110,7 +110,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         public async Task CanCreateParallel()
         {
             var blobCache = CreateDefaultBlobCache();
-            var path = "Test/test2.png";
+            var path = "resources/test2.png";
 
             var tasks = new List<Task<ICacheResult>>(10);
 

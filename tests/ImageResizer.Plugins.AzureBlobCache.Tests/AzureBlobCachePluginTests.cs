@@ -20,7 +20,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         public async Task CanProcessAsync()
         {
             var plugin = CreateBlobCachePlugin();
-            var localPath = "test/test4.jpg";
+            var localPath = "resources/test4.jpg";
 
             using (var writer = new StringWriter())
             {
@@ -43,7 +43,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
         public void CantProcessSync()
         {
             var plugin = CreateBlobCachePlugin();
-            var localPath = "test/test4.jpg";
+            var localPath = "resources/test4.jpg";
 
             using (var writer = new StringWriter())
             {
