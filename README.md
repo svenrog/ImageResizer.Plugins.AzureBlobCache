@@ -46,6 +46,7 @@ This element has a list of attributes that can be provided for detailed control 
 | connectionName | Name of connection to Azure blob storage in `connectionStrings.config`. | `"ResizerAzureBlobs"`
 | containerName | Name of the container where cache blobs are to be stored. | `"imagecache"` |
 | timeoutSeconds | Seconds before attempt to fetch cache item is aborted (after which the underlying image is returned normally). | 5 |
+| logging | If logging should be enabled or not, set to either `true` or `false` (requires either `ImageResizer.Plugins.Logging` or [`ImageResizer.Plugins.Log4net`](https://github.com/svenrog/ImageResizer.Plugins.Log4net)). | `false` |
 | memoryStoreLimitMb | If provided, a memory cache is created, where recent cache items are kept (for increased performance). |
 | memoryStoreSlidingExpiration | The [sliding expiration](https://peterdaugaardrasmussen.com/2017/10/02/c-emorycache-absolute-expiration-vs-sliding-expiration/#slidingexpiration) time of a cache item in [`System.TimeSpan` format](https://docs.microsoft.com/en-us/dotnet/standard/base-types/custom-timespan-format-strings) (`"HH:MM:SS"`). | `"00:30:00"` |
 | memoryStoreAbsoluteExpiration | The [absolute expiration](https://peterdaugaardrasmussen.com/2017/10/02/c-emorycache-absolute-expiration-vs-sliding-expiration/#absoluteexpiration) time of a cache item (overrides sliding expiration if provided `"HH:MM:SS"`). |
