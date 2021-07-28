@@ -9,7 +9,9 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Azure blob storage caching for images resized with ImageResizer</description>
         <projectUrl>https://github.com/svenrog/ImageResizer.Plugins.AzureBlobCache</projectUrl>
-        <copyright>Copyright © Geta 2021</copyright>
+        <licenseUrl>https://github.com/svenrog/ImageResizer.Plugins.AzureBlobCache/blob/master/LICENSE</licenseUrl>
+        <copyright>Copyright 2021 © Sven-Erik Jonsson, Geta AS</copyright>
+        <tags>ImageResizer Image Resizer BlobCache Blob Azure ImageResizing Resizing Image Resizer ImageResizer.Net Imazen Imazen.Net</tags>
         <dependencies>
             <group targetFramework=".NETFramework4.6.1">
                 <dependency id="ImageResizer" version="4.0.1"  />
