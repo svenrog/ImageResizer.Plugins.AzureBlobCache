@@ -80,6 +80,7 @@
     <Compile Include="AzureBlobCachePlugin.cs" />
     <Compile Include="AzureBlobCacheQueryResult.cs" />
     <Compile Include="AzureBlobCacheMemoryStore.cs" />
+    <Compile Include="Extensions\LoggerProviderExtensions.cs" />
     <Compile Include="Handlers\ResponseTransformer.cs" />
     <Compile Include="Indexing\CleaningStrategy.cs" />
     <Compile Include="Indexing\ConcurrencyHandlingContextBase.cs" />
@@ -89,6 +90,7 @@
     <Compile Include="Indexing\IndexEntityComparer.cs" />
     <Compile Include="Indexing\IndexMigrationConfiguration.cs" />
     <Compile Include="Indexing\IndexWorker.cs" />
+    <Compile Include="Logging\NullLogger.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Handlers\MemoryCacheHandler.cs" />
   </ItemGroup>

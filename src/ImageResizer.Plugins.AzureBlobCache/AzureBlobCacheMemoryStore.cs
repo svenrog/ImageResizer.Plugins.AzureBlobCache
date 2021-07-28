@@ -1,4 +1,6 @@
 ﻿using ImageResizer.Caching.Core;
+using ImageResizer.Configuration.Logging;
+using ImageResizer.Plugins.AzureBlobCache.Extensions;
 using System;
 using System.Collections.Specialized;
 using System.Runtime.Caching;
@@ -10,14 +12,16 @@ namespace ImageResizer.Plugins.AzureBlobCache
         private const string _name = nameof(AzureBlobCacheMemoryStore);
         private readonly TimeSpan? _absoluteExpiry;
         private readonly TimeSpan? _slidingExpiry;
+        private readonly ILoggerProvider _log;
         
         protected readonly MemoryCache Store;
 
-        public AzureBlobCacheMemoryStore(int? cacheMemoryLimitMb, TimeSpan? absoluteExpiry = null, TimeSpan? slidingExpiry = null, TimeSpan? pollingInterval = null) : this(cacheMemoryLimitMb, null, absoluteExpiry, slidingExpiry, pollingInterval) { }
-        public AzureBlobCacheMemoryStore(int? cacheMemoryLimitMb, int? physicalMemoryLimitPercentage = null, TimeSpan? absoluteExpiry = null, TimeSpan? slidingExpiry = null, TimeSpan? pollingInterval = null)
+        public AzureBlobCacheMemoryStore(int? cacheMemoryLimitMb, TimeSpan? absoluteExpiry = null, TimeSpan? slidingExpiry = null, TimeSpan? pollingInterval = null, ILoggerProvider loggerProvider = null) : this(cacheMemoryLimitMb, null, absoluteExpiry, slidingExpiry, pollingInterval, loggerProvider) { }
+        public AzureBlobCacheMemoryStore(int? cacheMemoryLimitMb, int? physicalMemoryLimitPercentage = null, TimeSpan? absoluteExpiry = null, TimeSpan? slidingExpiry = null, TimeSpan? pollingInterval = null, ILoggerProvider loggerProvider = null)
         {
             _absoluteExpiry = absoluteExpiry;
             _slidingExpiry = slidingExpiry;
+            _log = loggerProvider;
 
             var config = GetConfig(cacheMemoryLimitMb, physicalMemoryLimitPercentage, pollingInterval ?? TimeSpan.FromMinutes(4));
             Store = new MemoryCache(_name, config);
@@ -48,6 +52,9 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 AbsoluteExpiration = absoluteExpiration,
                 SlidingExpiration = slidingExpiration
             };
+
+            if (_log.IsDebugEnabled())
+                _log.Debug($"Inserting item with key '{key:D}' into memory cache.");
 
             Store.Add(cacheItem, policy);
         }

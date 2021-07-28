@@ -2,6 +2,8 @@
 using System.Timers;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using ImageResizer.Configuration.Logging;
+using ImageResizer.Plugins.AzureBlobCache.Extensions;
 
 namespace ImageResizer.Plugins.AzureBlobCache.Indexing
 {
@@ -10,6 +12,7 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
         private readonly Func<Task> _task;
         private readonly Timer _timer;
         private readonly Queue<DateTime> _workQueue;
+        private readonly ILoggerProvider _log;
         private readonly int _queueTaskEvery;
         private readonly int _queueMaxItems;
         
@@ -24,10 +27,11 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
         /// <param name="task"></param>
         /// <param name="taskInterval">The interval in which to check the queue</param>
         /// <param name="queueTaskEvery">Queues the task every nth callback</param>
-        public IndexWorker(Func<Task> task, TimeSpan taskInterval, int queueTaskEvery = 1)
+        public IndexWorker(Func<Task> task, TimeSpan taskInterval, int queueTaskEvery = 1, ILoggerProvider loggerProvider = null)
         {
             _task = task;
             _workQueue = new Queue<DateTime>();
+            _log = loggerProvider;
             _timer = new Timer
             {
                 Interval = taskInterval.TotalMilliseconds
@@ -55,6 +59,8 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
             if (_started)
                 return;
 
+            _log.Debug("Starting index worker");
+
             _timer.Elapsed += new ElapsedEventHandler(Timer_Elapsed);
             _timer.Start();
             _started = true;
@@ -64,6 +70,8 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
         {
             if (_started == false)
                 return;
+
+            _log.Debug("Stopping index worker");
 
             _timer.Stop();
             _timer.Elapsed -= new ElapsedEventHandler(Timer_Elapsed);
@@ -114,10 +122,17 @@ namespace ImageResizer.Plugins.AzureBlobCache.Indexing
 
             try
             {
+                _log.Debug("Index worker starting work on queued task");
+
                 await _task();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                if (_log.IsErrorEnabled())
+                {
+                    _log.Error("Index worker encountered an error", ex);
+                }
+
                 _workQueue.Enqueue(requestedTime);
             }
             finally

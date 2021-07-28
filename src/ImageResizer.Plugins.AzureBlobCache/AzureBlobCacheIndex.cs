@@ -1,6 +1,8 @@
 ﻿using ImageResizer.Caching.Core.Extensions;
 using ImageResizer.Caching.Core.Indexing;
 using ImageResizer.Caching.Core.Operation;
+using ImageResizer.Configuration.Logging;
+using ImageResizer.Plugins.AzureBlobCache.Extensions;
 using ImageResizer.Plugins.AzureBlobCache.Indexing;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
@@ -23,16 +25,17 @@ namespace ImageResizer.Plugins.AzureBlobCache
         private readonly CleaningStrategy _cleanupStrategy;
         private readonly Lazy<CloudBlobContainer> _containerClient;
         private readonly IndexWorker _indexWorker;
+        private readonly ILoggerProvider _log;
 
         private bool _disposed;
 
-        public AzureBlobCacheIndex(string connectionString, string containerName, int? containerMaxSizeInMb = null, int? containerMaxItems = null, string workerPollingInterval = null) : this(containerMaxSizeInMb, containerMaxItems, workerPollingInterval)
+        public AzureBlobCacheIndex(string connectionString, string containerName, int? containerMaxSizeInMb = null, int? containerMaxItems = null, string workerPollingInterval = null, ILoggerProvider loggerProvider = null) : this(containerMaxSizeInMb, containerMaxItems, workerPollingInterval, loggerProvider)
         {
             _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
             _containerName = containerName ?? throw new ArgumentNullException(nameof(containerName));    
         }
 
-        public AzureBlobCacheIndex(int? containerMaxSizeInMb = null, int? containerMaxItems = null, string workerPollingInterval = null, Func<CloudBlobContainer> containerClientFactory = null)
+        public AzureBlobCacheIndex(int? containerMaxSizeInMb = null, int? containerMaxItems = null, string workerPollingInterval = null, ILoggerProvider loggerProvider = null, Func<CloudBlobContainer> containerClientFactory = null)
         {
             if (containerMaxSizeInMb.HasValue)
             {
@@ -51,6 +54,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
             TimeSpan.TryParse(workerPollingInterval ?? "00:05:00", out var workerInterval);
 
+            _log = loggerProvider;
             _indexWorker = new IndexWorker(() => TrimIndex(100), workerInterval, 25);
             _containerClient = new Lazy<CloudBlobContainer>(containerClientFactory ?? InitializeContainer);
         }
@@ -82,6 +86,14 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 if (updatedIndex)
                 {
                     await context.SaveChangesDatabaseWinsAsync();
+
+                    if (_log.IsDebugEnabled())
+                    {
+                        if (existingEntity == null)
+                            _log.Debug($"Added item with key '{guid:D}' to index.");
+                        else
+                            _log.Debug($"Updated item with key '{guid:D}' in index.");
+                    }                        
 
                     _indexWorker.Poll();
                 }
@@ -150,8 +162,11 @@ namespace ImageResizer.Plugins.AzureBlobCache
                     throw new InvalidOperationException("Could not find implementation for strategy");
                 }
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException ex)
             {
+                if (_log.IsErrorEnabled())
+                    _log.Error("Error occurred estimating container size", ex);
+
                 return 0;
             }
         }
@@ -165,8 +180,11 @@ namespace ImageResizer.Plugins.AzureBlobCache
                     return await context.IndexEntities.CountAsync();
                 }
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException ex)
             {
+                if (_log.IsErrorEnabled())
+                    _log.Error("Error occurred counting items in index", ex);
+
                 return 0;
             }
         }
@@ -203,6 +221,9 @@ namespace ImageResizer.Plugins.AzureBlobCache
                     }
                     else
                     {
+                        if (_log.IsErrorEnabled())
+                            _log.Error($"Not implemented cleaning strategy encountered '{_cleanupStrategy}'");
+
                         throw new InvalidOperationException("Could not find implementation for strategy");
                     }
                 }

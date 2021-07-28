@@ -140,12 +140,12 @@ namespace ImageResizer.Plugins.AzureBlobCache.Tests
 
         private AzureBlobCacheIndex CreateIndexSizeConstrained(int indexSizeConstraintMb)
         {
-            return new AzureBlobCacheIndex(indexSizeConstraintMb, null, "00:00:00.1", () => _containerClient.Value);
+            return new AzureBlobCacheIndex(indexSizeConstraintMb, null, "00:00:00.1", null, () => _containerClient.Value);
         }
 
         private AzureBlobCacheIndex CreateIndexItemConstrained(int indexItemConstraint)
         {
-            return new AzureBlobCacheIndex(null, indexItemConstraint, "00:00:00.1", () => _containerClient.Value);
+            return new AzureBlobCacheIndex(null, indexItemConstraint, "00:00:00.1", null, () => _containerClient.Value);
         }
 
         private CloudBlobContainer InitializeContainer()

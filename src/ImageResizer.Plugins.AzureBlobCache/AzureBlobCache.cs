@@ -1,6 +1,8 @@
 ﻿using ImageResizer.Caching.Core;
 using ImageResizer.Caching.Core.Indexing;
 using ImageResizer.Caching.Core.Threading;
+using ImageResizer.Configuration.Logging;
+using ImageResizer.Plugins.AzureBlobCache.Extensions;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using System;
@@ -18,27 +20,33 @@ namespace ImageResizer.Plugins.AzureBlobCache
         private readonly IThreadSynchronizer<Guid, SemaphoreSlim> _synchronizer;
         private readonly ICacheIndex _cacheIndex;
         private readonly ICacheStore _cacheStore;
+        private readonly ILoggerProvider _log;
         private readonly bool _storeDisabled;
 
         private readonly Lazy<CloudBlobContainer> _containerClient;
 
-        public AzureBlobCache(string connectionString, string containerName) : this(connectionString, containerName, new NullCacheIndex(), new NullCacheStore()) { }
-        public AzureBlobCache(string connectionString, string containerName, ICacheStore cacheStore) : this(connectionString, containerName, new NullCacheIndex(), cacheStore) { }
-        public AzureBlobCache(string connectionString, string containerName, ICacheIndex cacheIndex, ICacheStore cacheStore) : this(cacheIndex, cacheStore)
+        public AzureBlobCache(string connectionString, string containerName) : this(connectionString, containerName, new NullCacheIndex(), new NullCacheStore(), null) { }
+        public AzureBlobCache(string connectionString, string containerName, ILoggerProvider loggerProvider) : this(connectionString, containerName, new NullCacheIndex(), new NullCacheStore(), loggerProvider) { }
+        public AzureBlobCache(string connectionString, string containerName, ICacheStore cacheStore) : this(connectionString, containerName, new NullCacheIndex(), cacheStore, null) { }
+        public AzureBlobCache(string connectionString, string containerName, ICacheStore cacheStore, ILoggerProvider loggerProvider) : this(connectionString, containerName, new NullCacheIndex(), cacheStore, loggerProvider) { }
+        public AzureBlobCache(string connectionString, string containerName, ICacheIndex cacheIndex, ICacheStore cacheStore) : this(connectionString, containerName, cacheIndex, cacheStore, null) { }
+        public AzureBlobCache(string connectionString, string containerName, ICacheIndex cacheIndex, ICacheStore cacheStore, ILoggerProvider loggerProvider) : this(cacheIndex, cacheStore, loggerProvider)
         {
             _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
             _containerName = containerName ?? throw new ArgumentNullException(nameof(containerName));
         }
 
-        public AzureBlobCache(Func<CloudBlobContainer> containerClientFactory) : this(new NullCacheIndex(), new NullCacheStore(), containerClientFactory) { }
-        public AzureBlobCache(ICacheIndex cacheIndex, Func<CloudBlobContainer> containerClientFactory) : this(cacheIndex, new NullCacheStore(), containerClientFactory) { }
-        protected AzureBlobCache(ICacheIndex cacheIndex, ICacheStore cacheStore, Func<CloudBlobContainer> containerClientFactory = null)
+        public AzureBlobCache(Func<CloudBlobContainer> containerClientFactory) : this(new NullCacheIndex(), new NullCacheStore(), containerClientFactory: containerClientFactory) { }
+        public AzureBlobCache(ILoggerProvider loggerProvider, Func<CloudBlobContainer> containerClientFactory) : this(new NullCacheIndex(), new NullCacheStore(), loggerProvider, containerClientFactory) { }
+        public AzureBlobCache(ICacheIndex cacheIndex, ILoggerProvider loggerProvider, Func<CloudBlobContainer> containerClientFactory) : this(cacheIndex, new NullCacheStore(), loggerProvider, containerClientFactory) { }
+        protected AzureBlobCache(ICacheIndex cacheIndex, ICacheStore cacheStore, ILoggerProvider loggerProvider = null, Func<CloudBlobContainer> containerClientFactory = null)
         {            
             _cacheIndex = cacheIndex ?? throw new ArgumentNullException(nameof(cacheIndex));
             _cacheStore = cacheStore ?? throw new ArgumentNullException(nameof(cacheStore));
 
             _synchronizer = new SemaphoreSynchronizer<Guid>();
             _containerClient = new Lazy<CloudBlobContainer>(containerClientFactory ?? InitializeContainer);
+            _log = loggerProvider;
 
             _storeDisabled = cacheStore is NullCacheStore;
         }
@@ -48,7 +56,12 @@ namespace ImageResizer.Plugins.AzureBlobCache
             // Optimistic cache fetch
             var storedResult = _cacheStore.Get(key);
             if (storedResult != null)
+            {
+                if (_log.IsDebugEnabled())
+                    _log.Debug($"Cache request '{key:D}' delivered from optimistic memory cache query.");
+
                 return storedResult;
+            }               
 
             var blob = GetBlob(key);
             var readLock = _synchronizer[key];
@@ -63,7 +76,12 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 // Pessimistic cache fetch
                 storedResult = _cacheStore.Get(key);
                 if (storedResult != null)
+                {
+                    if (_log.IsDebugEnabled())
+                        _log.Debug($"Cache request '{key:D}' delivered from pessimistic memory cache query.");
+
                     return storedResult;
+                }
 
                 try
                 {
@@ -81,11 +99,17 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 }
                 catch (StorageException ex) when (ex.Message.Contains("(404)"))
                 {
+                    if (_log.IsDebugEnabled())
+                        _log.Debug($"Cache request '{key:D}' not found in blob storage.");
+
                     return CreateResult(CacheQueryResult.Miss);
                 }
             }
             catch (OperationCanceledException)
             {
+                if (_log.IsWarnEnabled())
+                    _log.Warn($"Cache request '{key:D}' timed out.");
+
                 return CreateResult(CacheQueryResult.Failed);
             }
             finally

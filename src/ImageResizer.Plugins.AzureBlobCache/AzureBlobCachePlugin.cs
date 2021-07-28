@@ -4,7 +4,9 @@ using ImageResizer.Caching.Core.Identity;
 using ImageResizer.Caching.Core.Indexing;
 using ImageResizer.Caching.Core.Operation;
 using ImageResizer.Configuration;
+using ImageResizer.Configuration.Logging;
 using ImageResizer.Plugins.AzureBlobCache.Handlers;
+using ImageResizer.Plugins.AzureBlobCache.Logging;
 using ImageResizer.Plugins.Basic;
 using System;
 using System.Configuration;
@@ -15,7 +17,7 @@ using System.Web;
 
 namespace ImageResizer.Plugins.AzureBlobCache
 {
-    public class AzureBlobCachePlugin : IAsyncTyrantCache, ICache, IPlugin
+    public class AzureBlobCachePlugin : IAsyncTyrantCache, ICache, IPlugin, ILoggerProvider
     {
         private volatile bool _started = false;
 
@@ -33,14 +35,22 @@ namespace ImageResizer.Plugins.AzureBlobCache
         protected string IndexPollingInterval = "00:05:00";
 
         protected int ClientCacheMinutes;
+        protected bool LoggingEnabled;
 
         private IAsyncCacheProvider _cacheProvider;
         private ICacheKeyGenerator _keyGenerator;
+        private ILogger _logger;
+
+        public virtual ILogger Logger => _logger;
 
         public virtual async Task ProcessAsync(HttpContext context, IAsyncResponsePlan plan)
         {
             using (var tokenSource = GetTokenSource())
             {
+                var operationTiming = new Stopwatch();
+
+                operationTiming.Start();
+
                 var key = _keyGenerator.Generate(plan.RequestCachingKey, plan.EstimatedFileExtension);
                 var cacheResult = await _cacheProvider.GetAsync(key, tokenSource.Token);
 
@@ -48,6 +58,11 @@ namespace ImageResizer.Plugins.AzureBlobCache
                 {
                     cacheResult = await _cacheProvider.CreateAsync(key, tokenSource.Token, (stream) => plan.CreateAndWriteResultAsync(stream, plan));
                 }
+
+                operationTiming.Stop();
+
+                if (_logger?.IsDebugEnabled ?? false)
+                    _logger.Debug($"Cache result '{cacheResult.Result}' for key '{key:D}' and resizer key '{plan.RequestCachingKey}', has content: {cacheResult.Contents != null}, operation took: {operationTiming.ElapsedMilliseconds} ms");
 
                 // Note: Since the async pipleine doesn't have support for client caching, we're patching it here.
                 // https://github.com/imazen/resizer/issues/166
@@ -76,6 +91,8 @@ namespace ImageResizer.Plugins.AzureBlobCache
         public IPlugin Install(Config config)
         {
             LoadSettings(config);
+            ConfigureLogger(config);
+
             Start();
 
             config.Plugins.add_plugin(this);
@@ -100,6 +117,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
             ConnectionName = config.get("azureBlobCache.connectionName", ConnectionName);
             ContainerName = config.get("azureBlobCache.containerName", ContainerName);
             TimeoutSeconds = config.get("azureBlobCache.timeoutSeconds", TimeoutSeconds);
+            LoggingEnabled = config.get("azureBlobCache.logging", LoggingEnabled);
             IndexMaxSizeMb = config.get("azureBlobCache.indexMaxSizeMb", IndexMaxSizeMb);
             IndexMaxItems = config.get("azureBlobCache.indexMaxItems", IndexMaxItems);
             IndexPollingInterval = config.get("azureBlobCache.indexPollingInterval", IndexPollingInterval);
@@ -107,7 +125,8 @@ namespace ImageResizer.Plugins.AzureBlobCache
             MemoryStorePollingInterval = config.get("azureBlobCache.memoryStorePollingInterval", MemoryStorePollingInterval);
             MemoryStoreSlidingExpiration = config.get("azureBlobCache.memoryStoreSlidingExpiration", MemoryStoreSlidingExpiration);
             MemoryStoreAbsoluteExpiration = config.get("azureBlobCache.memoryStoreAbsoluteExpiration", MemoryStoreAbsoluteExpiration);
-            ClientCacheMinutes = config.get("clientcache.minutes", ClientCacheMinutes);
+
+            ClientCacheMinutes = config.get("clientcache.minutes", ClientCacheMinutes);            
         }
 
         public virtual void Process(HttpContext current, IResponseArgs e)
@@ -132,7 +151,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
         protected virtual void Start()
         {
-            _cacheProvider = new AzureBlobCache(GetConnection(ConnectionName), ContainerName, GetCacheIndex(), GetCacheStore());
+            _cacheProvider = new AzureBlobCache(GetConnection(ConnectionName), ContainerName, GetCacheIndex(), GetCacheStore(), this);
             _keyGenerator = GetKeyGenerator();
 
             var index = GetConfiguredIndex();
@@ -201,13 +220,35 @@ namespace ImageResizer.Plugins.AzureBlobCache
             return ConfigurationManager.ConnectionStrings[name]?.ConnectionString;
         }
 
+        private void ConfigureLogger(Config config)
+        {
+            var logManager = config.Plugins.LogManager;
+            if (logManager == null)
+            {
+                _logger = new NullLogger();
+                config.Plugins.LoggingAvailable += CreateLogger;
+            }
+            else
+            {
+                CreateLogger(logManager);
+            }
+        }
+
+        private void CreateLogger(ILogManager manager)
+        {
+            if (_logger is NullLogger == false)
+                return;
+
+            _logger = manager.GetLogger(typeof(AzureBlobCachePlugin).Namespace);
+        }
+
         private ICacheIndex GetCacheIndex()
         {
             var maxSizeMb = IndexMaxSizeMb > 0 ? IndexMaxSizeMb : (int?)null;
             var maxItems = IndexMaxItems > 0 ? IndexMaxItems : (int?)null;
 
             if (maxSizeMb.HasValue || maxItems.HasValue)
-                return new AzureBlobCacheIndex(GetConnection(ConnectionName), ContainerName, maxSizeMb, maxItems, IndexPollingInterval);
+                return new AzureBlobCacheIndex(GetConnection(ConnectionName), ContainerName, maxSizeMb, maxItems, IndexPollingInterval, this);
 
             return new NullCacheIndex();
         }
@@ -221,7 +262,7 @@ namespace ImageResizer.Plugins.AzureBlobCache
             var slidingExpiration = GetTimeSpan(MemoryStoreSlidingExpiration);
             var pollingInterval = GetTimeSpan(MemoryStorePollingInterval);
 
-            return new AzureBlobCacheMemoryStore(MemoryStoreLimitMb, absoluteExpiration, slidingExpiration, pollingInterval);
+            return new AzureBlobCacheMemoryStore(MemoryStoreLimitMb, absoluteExpiration, slidingExpiration, pollingInterval, this);
         }
 
         private TimeSpan? GetTimeSpan(string value)
