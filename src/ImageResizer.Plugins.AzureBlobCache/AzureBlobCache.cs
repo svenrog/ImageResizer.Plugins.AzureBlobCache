@@ -152,6 +152,9 @@ namespace ImageResizer.Plugins.AzureBlobCache
                     }
                     catch (OperationCanceledException)
                     {
+                        if (_log.IsWarnEnabled())
+                            _log.Warn($"Cache request '{key:D}' timed out.");
+
                         // Operation was cancelled while uploading or modifying index
                         // In this case, the image has been resized and should be returned
                         // Not returning it will cause another resize
@@ -162,6 +165,9 @@ namespace ImageResizer.Plugins.AzureBlobCache
             }
             catch (OperationCanceledException)
             {
+                if (_log.IsWarnEnabled())
+                    _log.Warn($"Cache request '{key:D}' timed out.");
+
                 // Operation was cancelled while waiting for another operation
                 // In this case, the image has not been resized yet
 

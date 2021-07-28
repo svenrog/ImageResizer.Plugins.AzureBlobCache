@@ -6,7 +6,6 @@ using ImageResizer.Caching.Core.Operation;
 using ImageResizer.Configuration;
 using ImageResizer.Configuration.Logging;
 using ImageResizer.Plugins.AzureBlobCache.Handlers;
-using ImageResizer.Plugins.AzureBlobCache.Logging;
 using ImageResizer.Plugins.Basic;
 using System;
 using System.Configuration;
@@ -61,8 +60,14 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
                 operationTiming.Stop();
 
-                if (_logger?.IsDebugEnabled ?? false)
-                    _logger.Debug($"Cache result '{cacheResult.Result}' for key '{key:D}' and resizer key '{plan.RequestCachingKey}', has content: {cacheResult.Contents != null}, operation took: {operationTiming.ElapsedMilliseconds} ms");
+                if (cacheResult.Result == CacheQueryResult.Failed && (_logger?.IsWarnEnabled ?? false))
+                {
+                    _logger.Warn($"Timeout result for key '{key:D}' and resizer key '{plan.RequestCachingKey}', has content: {cacheResult.Contents != null}, operation took: {operationTiming.ElapsedMilliseconds} ms.");
+                }
+                else if (_logger?.IsDebugEnabled ?? false)
+                {
+                    _logger.Debug($"Cache result '{cacheResult.Result}' for key '{key:D}' and resizer key '{plan.RequestCachingKey}', operation took: {operationTiming.ElapsedMilliseconds} ms");
+                }                    
 
                 // Note: Since the async pipleine doesn't have support for client caching, we're patching it here.
                 // https://github.com/imazen/resizer/issues/166
@@ -225,7 +230,6 @@ namespace ImageResizer.Plugins.AzureBlobCache
             var logManager = config.Plugins.LogManager;
             if (logManager == null)
             {
-                _logger = new NullLogger();
                 config.Plugins.LoggingAvailable += CreateLogger;
             }
             else
@@ -236,7 +240,10 @@ namespace ImageResizer.Plugins.AzureBlobCache
 
         private void CreateLogger(ILogManager manager)
         {
-            if (_logger is NullLogger == false)
+            if (LoggingEnabled == false)
+                return;
+
+            if (_logger != null)
                 return;
 
             _logger = manager.GetLogger(typeof(AzureBlobCachePlugin).Namespace);
